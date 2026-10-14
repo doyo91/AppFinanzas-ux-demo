@@ -97,7 +97,7 @@
 			</div>
 			<div>
 				<dt>Gastos registrados</dt>
-				<dd>{money(selected.expenses)}</dd>
+				<dd class="expense-amount">{money(selected.expenses)}</dd>
 			</div>
 			<div>
 				<dt>Resultado del mes</dt>

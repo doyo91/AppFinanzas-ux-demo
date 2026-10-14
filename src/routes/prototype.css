@@ -1998,7 +1998,7 @@ form input::placeholder {
 }
 .expense-key,
 .expense-bar {
-	background: #c3a780;
+	background: #bd3535;
 }
 .monthly-chart {
 	display: grid;
@@ -2132,3 +2132,26 @@ form input::placeholder {
 	width: 100%;
 	height: 12px;
 }
+
+/* Expenses have a consistent red treatment and explicit text labels. */
+.expense-amount,
+.movement-value.expense strong,
+.expense-metric > strong,
+.expense-metric > span { color: #b32626; }
+.movement-icon.expense { color: #b32626; background: #fce8e8; }
+.expense-metric { background: #fff5f5; border-color: #efcaca; }
+.father-hero .father-inline-metrics > .father-expense-total {
+  color: #8d1f1f;
+  background: #fff0f0;
+  border: 2px solid #ecaaaa;
+  border-radius: 10px;
+  padding: 14px;
+  font-weight: 700;
+}
+.father-hero .father-inline-metrics > .father-expense-total strong {
+  color: #a72121; font-weight: 800;
+}
+.father-expense-list .movement-value.expense strong { font-weight: 800; }
+.history-categories .history-category strong { color: #b32626; }
+.history-categories progress { --progress-color: #bd3535; }
+.chart-legend > span:has(.expense-key) { color: #b32626; font-weight: 700; }

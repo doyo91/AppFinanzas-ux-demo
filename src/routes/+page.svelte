@@ -289,6 +289,7 @@
 			>
 				<span
 					class="movement-icon"
+					class:expense={movement.kind === 'expense'}
 					class:positive={movement.kind === 'income'}
 					class:neutral={movement.kind === 'transfer' ||
 						movement.kind === 'investment'}
@@ -303,10 +304,10 @@
 				>
 				<span class="movement-text"
 					><strong>{movement.concept}</strong><small
-						>{movement.category} <span>·</span> {movement.account}</small
+						>{movement.kind === 'expense' ? 'Gasto · ' : ''}{movement.category} <span>·</span> {movement.account}</small
 					></span
 				>
-				<span class="movement-value" class:positive={movement.kind === 'income'}
+				<span class="movement-value" class:expense={movement.kind === 'expense'} class:positive={movement.kind === 'income'}
 					><strong
 						>{movement.kind === 'income'
 							? '+'
@@ -491,7 +492,7 @@
 							>{money(totals.income)}</strong
 						><small>Ingresos ordinarios registrados</small>
 					</article>
-					<article class="metric">
+					<article class="metric expense-metric">
 						<span>Gastos del mes <Icon name="up" /></span><strong
 							>{money(totals.expenses)}</strong
 						><small
@@ -749,7 +750,7 @@
 									>Ingresos registrados<strong
 										>{money(fatherTotals.income)}</strong
 									></span
-								><span
+								><span class="father-expense-total"
 									>Gastos registrados<strong
 										>{money(fatherTotals.expenses)}</strong
 									></span
@@ -885,7 +886,7 @@
 								</div>
 								<div>
 									<dt>Gastos</dt>
-									<dd>{money(result.expenses)}</dd>
+									<dd class="expense-amount">{money(result.expenses)}</dd>
 								</div>
 								<div>
 									<dt>Ahorro</dt>
@@ -1118,7 +1119,7 @@
 				onclick={() => detailDialog.close()}><Icon name="close" /></button
 			>
 		</div>
-		<strong class="detail-amount">{money(selected.amount)}</strong>
+		<strong class="detail-amount" class:expense-amount={selected.kind === 'expense'}>{selected.kind === 'expense' ? '−' : ''}{money(selected.amount)}</strong>
 		<dl>
 			<div>
 				<dt>Tipo</dt>
