@@ -3,6 +3,9 @@ import test from 'node:test';
 import {
 	fatherBudgets,
 	DEMO_PERIODS,
+	currentHistoryPeriod,
+	historyPeriods,
+	historyYears,
 	categorySpend,
 	initialMovements,
 	parseAmount,
@@ -204,4 +207,22 @@ test('six synthetic months are reproducible, detailed and have unique valid move
 		}
 	}
 	assert.ok(summarize(data, 'father', '2026-07').savings < 0);
+});
+
+
+test('history defaults follow the Madrid year boundary and months do not leak between years', () => {
+	assert.equal(currentHistoryPeriod(new Date('2026-12-31T22:59:59Z')), '2026-12');
+	assert.equal(currentHistoryPeriod(new Date('2026-12-31T23:00:00Z')), '2027-01');
+	const periods = historyPeriods(2027);
+	assert.equal(periods.length, 12);
+	assert.deepEqual(periods[0], { month: '2027-01', label: 'Enero' });
+	assert.equal(periods[11].month, '2027-12');
+	const data = initialMovements();
+	assert.deepEqual(summarize(data, 'father', '2027-07'), {
+		income: 0, expenses: 0, savings: 0, fixed: 0, variable: 0, investment: 0, rate: null,
+	});
+	const scoped = [...data, { ...data[0], id: 'old-own', context: 'own', date: '2020-01-01' }];
+	assert.ok(historyYears(scoped, 'own', 2027).includes(2020));
+	assert.ok(!historyYears(scoped, 'father', 2027).includes(2020));
+	assert.ok(historyYears(scoped, 'father', 2027).includes(2027));
 });

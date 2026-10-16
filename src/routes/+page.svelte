@@ -851,56 +851,10 @@
 						</div>{/each}
 				</section>
 			{:else if page === 'history'}
-				<FatherHistory {movements} context="own" />
-				<div class="context-notice">
-					<Icon name="calendar" />
-					<p>
-						Mayo a septiembre contienen meses completos de ejemplo. Octubre está en curso;
-						no lo compares como si estuviera completo.
-					</p>
-				</div>
-				<div class="history-grid">
-					{#each DEMO_PERIODS.toReversed() as { month: period }}{@const result = summarize(
-							movements,
-							'own',
-							period,
-						)}
-						<section class="panel history-card">
-							<div class="panel-title">
-								<h2>{monthLabels[period]}</h2>
-								<span class="soft-tag"
-									>{period === DEMO_MONTH ? 'En curso' : 'Ejemplo'}</span
-								>
-							</div>
-							<dl>
-								<div>
-									<dt>Ingresos</dt>
-									<dd>{money(result.income)}</dd>
-								</div>
-								<div>
-									<dt>Gastos</dt>
-									<dd class="expense-amount">{money(result.expenses)}</dd>
-								</div>
-								<div>
-									<dt>Ahorro</dt>
-									<dd class="positive">{money(result.savings)}</dd>
-								</div>
-								<div>
-									<dt>Margen de ahorro</dt>
-									<dd>
-										{result.rate ?? '—'}{result.rate === null ? '' : ' %'}
-									</dd>
-								</div>
-							</dl>
-							<button
-								class="text-button"
-								onclick={() => {
-									month = period;
-									navigate('movements');
-								}}>Consultar movimientos <Icon name="arrow" size={16} /></button
-							>
-						</section>{/each}
-				</div>
+				<FatherHistory {movements} context="own" onview={(period) => {
+					month = period;
+					navigate('movements');
+				}} />
 			{:else if page === 'emergency'}
 				<section class="panel emergency-detail">
 					<span class="icon-tile"><Icon name="shield" size={28} /></span>

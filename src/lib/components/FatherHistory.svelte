@@ -1,7 +1,9 @@
 <script lang="ts">
 	import {
 		money,
-		DEMO_PERIODS,
+		currentHistoryPeriod,
+		historyPeriods,
+		historyYears,
 		summarize,
 		categorySpend,
 		categories,
@@ -11,10 +13,21 @@
 	let {
 		movements,
 		context = 'father',
-	}: { movements: Movement[]; context?: Context } = $props();
-	let selectedMonth = $state('2026-10');
+		onview,
+	}: { movements: Movement[]; context?: Context; onview?: (month: string) => void } = $props();
+	const currentPeriod = currentHistoryPeriod();
+	const currentYear = Number(currentPeriod.slice(0, 4));
+	let selectedYear = $state(currentYear);
+	let monthNumber = $state(currentPeriod.slice(5));
+	let selectedMonth = $derived(`${selectedYear}-${monthNumber}`);
+	let years = $derived(historyYears(movements, context, currentYear));
+	let chart: HTMLDivElement;
+	$effect(() => {
+		selectedMonth;
+		chart?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+	});
 	let history = $derived(
-		DEMO_PERIODS.map((period) => ({
+		historyPeriods(selectedYear).map((period) => ({
 			...period,
 			...summarize(movements, context, period.month),
 		})),
@@ -28,6 +41,8 @@
 	let selected = $derived(
 		history.find((period) => period.month === selectedMonth)!,
 	);
+	let hasMovements = $derived(movements.some((m) => m.context === context && m.date.startsWith(selectedMonth)));
+	let hasYearMovements = $derived(movements.some((m) => m.context === context && m.date.startsWith(`${selectedYear}-`)));
 	let breakdown = $derived(
 		categories
 			.map((name) => ({
@@ -43,10 +58,21 @@
 	<div class="panel-title">
 		<div>
 			<h2>Así van tus meses</h2>
-			<p>Ingresos y gastos registrados · 2026</p>
+			<p>Ingresos y gastos registrados · {selectedYear}</p>
 		</div>
 		<span class="soft-tag">Datos ficticios</span>
 	</div>
+	<div class="history-selectors">
+		<label>Año<select aria-label="Año del histórico" bind:value={selectedYear}>
+			{#each years as year}<option value={year}>{year}</option>{/each}
+		</select></label>
+		{#if context === 'own'}
+			<label>Mes<select aria-label="Mes del histórico" bind:value={monthNumber}>
+				{#each history as period}<option value={period.month.slice(5)}>{period.label}</option>{/each}
+			</select></label>
+		{/if}
+	</div>
+	{#if !hasYearMovements}<p class="history-empty" role="status">Sin movimientos registrados en {selectedYear}.</p>{/if}
 	<div class="chart-legend">
 		<span><i class="income-key"></i>Ingresos</span><span
 			><i class="expense-key"></i>Gastos</span
@@ -54,6 +80,7 @@
 	</div>
 	<div
 		class="monthly-chart"
+		bind:this={chart}
 		style={`grid-template-columns:repeat(${history.length}, minmax(100px, 1fr));overflow-x:auto`}
 		role="group"
 		aria-label="Seleccionar mes del histórico"
@@ -64,7 +91,7 @@
 				class:selected={selectedMonth === period.month}
 				aria-pressed={selectedMonth === period.month}
 				aria-label={`${period.label}: ingresos ${money(period.income)}, gastos ${money(period.expenses)}`}
-				onclick={() => (selectedMonth = period.month)}
+				onclick={() => (monthNumber = period.month.slice(5))}
 			>
 				<span class="chart-bars" aria-hidden="true"
 					><i
@@ -76,15 +103,16 @@
 					></i></span
 				>
 				<strong>{period.label}</strong><small
-					>{period.month === '2026-10'
+					>{period.month === currentPeriod
 						? 'Mes en curso'
-						: 'Mes de ejemplo'}</small
+						: movements.some((m) => m.context === context && m.date.startsWith(period.month)) ? 'Registrado' : 'Sin movimientos'}</small
 				>
 			</button>
 		{/each}
 	</div>
 	<div class="selected-month" aria-live="polite">
-		<h3>{selected.label} 2026</h3>
+		<h3>{selected.label} {selectedYear}</h3>
+		{#if !hasMovements}<p class="history-empty" role="status">Sin movimientos registrados en este mes.</p>{:else}
 		<dl>
 			<div>
 				<dt>Ingresos registrados</dt>
@@ -98,7 +126,12 @@
 				<dt>Resultado del mes</dt>
 				<dd class:expense-amount={selected.savings < 0}>{money(selected.savings)}</dd>
 			</div>
+			{#if context === 'own'}
+				<div><dt>Margen de ahorro</dt><dd>{selected.rate ?? '—'}{selected.rate === null ? '' : ' %'}</dd></div>
+			{/if}
 		</dl>
+		{/if}
+		{#if onview && hasMovements}<button class="text-button history-movements" onclick={() => onview?.(selectedMonth)}>Consultar movimientos</button>{/if}
 	</div>
 	<section class="history-categories" aria-label="Gastos por categoría">
 		<h3>Gastos por categoría · {selected.label}</h3>
@@ -119,8 +152,16 @@
 
 	</section>
 	<div class="panel-footer">
-		Desliza el gráfico para ver todos los meses y toca uno para ver sus importes. Octubre está en curso: no lo compares
-		como si estuviera completo. El resultado no es el saldo bancario ni el
+		Desliza el gráfico para ver todos los meses y toca uno para ver sus importes. El mes en curso no debe compararse como si estuviera completo. El resultado no es el saldo bancario ni el
 		disponible prudente.
 	</div>
 </section>
+
+<style>
+	.history-selectors { display: flex; flex-wrap: wrap; gap: 16px; padding: 0 24px 24px; }
+	.history-selectors label { display: flex; align-items: center; gap: 8px; }
+	.history-selectors select { padding: 10px; border: 1px solid #cbd9c0; border-radius: 6px; background: #fff; color: inherit; font: inherit; }
+	.history-empty { padding: 12px 0; line-height: 1.6; }
+	.father-history > .history-empty { padding: 0 24px 20px; }
+	.history-movements { margin-bottom: 20px; }
+</style>

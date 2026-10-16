@@ -457,3 +457,27 @@ export function emergencyBalance(movements: Movement[]): number {
 			return balance;
 		}, 420000);
 }
+
+
+export function currentHistoryPeriod(now = new Date()): string {
+	const parts = new Intl.DateTimeFormat('en', {
+		timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit',
+	}).formatToParts(now);
+	return `${parts.find((p) => p.type === 'year')!.value}-${parts.find((p) => p.type === 'month')!.value}`;
+}
+
+export function historyPeriods(year: number) {
+	return Array.from({ length: 12 }, (_, index) => ({
+		month: `${year}-${String(index + 1).padStart(2, '0')}`,
+		label: new Intl.DateTimeFormat('es-ES', { month: 'long', timeZone: 'UTC' })
+			.format(new Date(Date.UTC(year, index, 1)))
+			.replace(/^./, (letter) => letter.toUpperCase()),
+	}));
+}
+
+export function historyYears(movements: Movement[], context: Context, currentYear: number) {
+	return [...new Set([
+		currentYear - 1, currentYear, currentYear + 1,
+		...movements.filter((m) => m.context === context).map((m) => Number(m.date.slice(0, 4))),
+	])].toSorted((a, b) => b - a);
+}
