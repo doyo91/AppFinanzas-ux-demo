@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Investments from '#lib/components/Investments.svelte';
+	import { initialPortfolios, initialValuations, createPortfolio, addContribution, saveValuation } from '#lib/demo/investments.ts';
 	import Icon from '#lib/components/Icon.svelte';
 	import FatherBudgets from '#lib/components/FatherBudgets.svelte';
 	import FatherHistory from '#lib/components/FatherHistory.svelte';
@@ -36,6 +38,8 @@
 		{ name: 'Deudas', mobile: 'Deudas', icon: 'person' },
 	];
 	let movements = $state(initialMovements());
+	let portfolios = $state(initialPortfolios());
+	let valuations = $state(initialValuations());
 	let budgets = $state(initialBudgets());
 	let entryContext = $state<Context>('own');
 	let editingId = $state<string | null>(null);
@@ -63,9 +67,13 @@
 		transfer: 'Transferencia',
 		investment: 'Aportación',
 	};
-	const monthLabels: Record<string, string> = Object.fromEntries(
-		DEMO_PERIODS.toReversed().map(({ month, label }) => [month, `${label} 2026`]),
-	);
+	let monthLabels: Record<string, string> = $derived(Object.fromEntries(
+		[...new Set([...DEMO_PERIODS.map((p) => p.month), ...movements.filter((m) => m.context === 'own').map((m) => m.date.slice(0, 7))])]
+			.toSorted((a, b) => b.localeCompare(a)).map((period) => {
+				const label = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${period}-01T12:00:00Z`));
+				return [period, label.replace(/^./, (letter) => letter.toUpperCase())];
+			}),
+	));
 	const titles: Record<Page, string> = {
 		home: 'Tu dinero, con perspectiva.',
 		movements: 'Cada movimiento cuenta.',
@@ -140,6 +148,8 @@
 	}
 	function reset() {
 		movements = initialMovements();
+		portfolios = initialPortfolios();
+		valuations = initialValuations();
 		budgets = initialBudgets();
 		query = '';
 		filter = 'all';
@@ -810,46 +820,12 @@
 						</p>
 					</section>{/if}
 			{:else if page === 'investments'}
-				<div class="context-notice">
-					<Icon name="chart" />
-					<p>
-						Vista de ejemplo. Valoraciones ficticias al 12 de octubre; todavía
-						no se calculan rentabilidades.
-					</p>
-				</div>
-				<div class="metrics">
-					<article class="metric savings">
-						<span>Valoración de ejemplo</span><strong>12.450,00 €</strong><small
-							>Dos carteras ficticias · 12 oct 2026</small
-						>
-					</article>
-					<article class="metric">
-						<span>Aportaciones de octubre</span><strong
-							>{money(
-								summarize(movements, 'own', DEMO_MONTH).investment,
-							)}</strong
-						><small>No reducen el ahorro ordinario</small>
-					</article>
-					<article class="metric">
-						<span>Rentabilidad Modified Dietz</span><strong class="unavailable"
-							>No disponible</strong
-						><small>Cálculo pendiente de implementación</small>
-					</article>
-				</div>
-				<section class="panel">
-					<div class="panel-title">
-						<h2>Tus carteras de ejemplo</h2>
-						<span class="soft-tag">Solo consulta</span>
-					</div>
-					{#each [{ name: 'Cartera a largo plazo', type: 'Valoración manual · 12 oct', value: 985000 }, { name: 'Cartera complementaria', type: 'Valoración manual · 12 oct', value: 260000 }] as portfolio}<div
-							class="portfolio-row"
-						>
-							<span class="icon-tile"><Icon name="chart" /></span><span
-								><strong>{portfolio.name}</strong><small>{portfolio.type}</small
-								></span
-							><strong>{money(portfolio.value)}</strong>
-						</div>{/each}
-				</section>
+				<Investments {movements} {portfolios} {valuations}
+					oncreate={(name) => { portfolios = createPortfolio(portfolios, { id: crypto.randomUUID(), name }, role); }}
+					oncontribute={(portfolioId, date, amount, account) => {
+						movements = addContribution(movements, portfolios, { id: crypto.randomUUID(), portfolioId, date, amount, account }, role);
+					}}
+					onvalue={(value) => { valuations = saveValuation(valuations, portfolios, value, role); }} />
 			{:else if page === 'history'}
 				<FatherHistory {movements} context="own" onview={(period) => {
 					month = period;

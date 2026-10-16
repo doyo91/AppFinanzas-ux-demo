@@ -11,6 +11,7 @@ export type Movement = {
 	category: string;
 	account: string;
 	destination?: string;
+	portfolioId?: string;
 	fixed: boolean;
 };
 
@@ -147,6 +148,7 @@ const seeds: Movement[] = [
 	},
 	{
 		id: 'o4',
+		portfolioId: 'long-term',
 		context: 'own',
 		date: '2026-10-04',
 		concept: 'Aportación mensual',
