@@ -17,6 +17,9 @@
 		{ month: '2026-09', label: 'Septiembre' },
 		{ month: '2026-10', label: 'Octubre' },
 	];
+	const expenseColors = [
+		'#a72121', '#c34b4b', '#da7770', '#b96b48', '#b18478', '#d4aaa0', '#9c687b',
+	];
 	let history = $derived(
 		periods
 			.filter((p) => context === 'father' || p.month !== '2026-08')
@@ -108,16 +111,38 @@
 	<section class="history-categories" aria-label="Gastos por categoría">
 		<h3>Gastos por categoría · {selected.label}</h3>
 		<p class="muted">Importes registrados en este mes y contexto.</p>
-		{#each breakdown as item}
-			<div class="history-category">
-				<div><span>{item.name}</span><strong>{money(item.amount)}</strong></div>
-				<progress
-					value={item.amount}
-					max={Math.max(1, ...breakdown.map((c) => c.amount))}
-					aria-label={`${item.name}: ${money(item.amount)}`}
-				></progress>
+		{#if context === 'father' && breakdown.length > 0}
+			<div class="spending-layout father-history-spending">
+				<div class="spending-total">
+					<span>Total gastado</span>
+					<strong class="expense-amount">{money(selected.expenses)}</strong>
+					<div class="mini-bars" aria-hidden="true">
+						{#each breakdown as item, index}
+							<i style={`height:${(item.amount / breakdown[0].amount) * 100}%;--bar-color:${expenseColors[index % expenseColors.length]}`}></i>
+						{/each}
+					</div>
+				</div>
+				<div class="category-breakdown">
+					{#each breakdown as item, index}
+						<div>
+							<span><i style={`background:${expenseColors[index % expenseColors.length]}`}></i>{item.name}</span>
+							<strong class="expense-amount">{money(item.amount)}</strong>
+						</div>
+					{/each}
+				</div>
 			</div>
-		{/each}
+		{:else}
+			{#each breakdown as item}
+				<div class="history-category">
+					<div><span>{item.name}</span><strong>{money(item.amount)}</strong></div>
+					<progress
+						value={item.amount}
+						max={Math.max(1, ...breakdown.map((c) => c.amount))}
+						aria-label={`${item.name}: ${money(item.amount)}`}
+					></progress>
+				</div>
+			{/each}
+		{/if}
 		{#if breakdown.length === 0}<p>
 				No hay gastos registrados en este mes de la demo.
 			</p>{/if}
@@ -132,3 +157,24 @@
 		disponible prudente.
 	</div>
 </section>
+
+<style>
+	.father-history-spending {
+		padding: 20px 0;
+	}
+	.father-history-spending .mini-bars i {
+		min-height: 0;
+		flex: 1;
+		max-width: 22px;
+	}
+	@media (max-width: 420px) {
+		.father-history-spending {
+			flex-wrap: wrap;
+			gap: 16px;
+		}
+		.father-history-spending .spending-total,
+		.father-history-spending .category-breakdown {
+			width: 100%;
+		}
+	}
+</style>
