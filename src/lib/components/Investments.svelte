@@ -1,143 +1,166 @@
 <script lang="ts">
-	import { money, parseAmount, DEMO_MONTH, type Movement } from '#lib/demo/model.ts';
-	import { latestValuation, type Portfolio, type Valuation } from '#lib/demo/investments.ts';
-	let { movements, portfolios, valuations, oncreate, oncontribute, onvalue }: {
-		movements: Movement[]; portfolios: Portfolio[]; valuations: Valuation[];
-		oncreate: (name: string) => void;
-		oncontribute: (portfolioId: string, date: string, amount: number, account: string) => void;
+	import { money, parseAmount, DEMO_MONTH, currentHistoryPeriod, historyPeriods, type Movement } from '#lib/demo/model.ts';
+	import { monthlyValuation, periodPerformance, investmentSeries, type Portfolio, type Platform, type Valuation } from '#lib/demo/investments.ts';
+	import InvestmentChart from './InvestmentChart.svelte';
+	let { movements, portfolios, platforms, valuations, onportfolio, onplatform, oncontribute, onvalue }: {
+		movements: Movement[]; portfolios: Portfolio[]; platforms: Platform[]; valuations: Valuation[];
+		onportfolio: (value: Portfolio) => void; onplatform: (value: Platform) => void;
+		oncontribute: (platformId: string, date: string, amount: number, account: string) => void;
 		onvalue: (value: Valuation) => void;
 	} = $props();
-	let selected = $state('all');
-	let action = $state<'portfolio' | 'contribution' | 'valuation'>('contribution');
-	let dialog: HTMLDialogElement;
-	let portfolioId = $state('');
-	let name = $state('');
-	let date = $state('2026-10-13');
-	let amount = $state('');
-	let account = $state('Cuenta principal');
-	let error = $state('');
-	let notice = $state('');
-	let cards = $derived(portfolios.filter((p) => selected === 'all' || p.id === selected));
-	let latest = $derived(cards.map((p) => latestValuation(valuations, p.id)));
-	let hasAllValues = $derived(latest.length > 0 && latest.every((v) => v !== null));
-	let total = $derived(latest.reduce((sum, value) => sum + (value?.amount ?? 0), 0));
-	let contributions = $derived(movements.filter((m) => m.context === 'own' && m.kind === 'investment' && (selected === 'all' || m.portfolioId === selected)));
-	let recentContributions = $derived(contributions.filter((m) => m.date.startsWith(DEMO_MONTH)).reduce((sum, m) => sum + m.amount, 0));
-	let entries = $derived([
-		...contributions.map((m) => ({ id: m.id, portfolioId: m.portfolioId, date: m.date, type: 'Aportación', amount: m.amount })),
-		...valuations.filter((v) => selected === 'all' || v.portfolioId === selected).map((v) => ({ id: `v-${v.portfolioId}-${v.date}`, ...v, type: 'Valoración' })),
+	const current = currentHistoryPeriod();
+	let tab = $state('Resumen');
+	let portfolioId = $state('long-term');
+	let platformFilter = $state('all');
+	let year = $state(Number(current.slice(0, 4)));
+	let monthNumber = $state(current.slice(5));
+	let period = $derived(`${year}-${monthNumber}`);
+	let years = $derived([...new Set([Number(current.slice(0, 4)), Number(current.slice(0, 4)) + 1, ...valuations.map((v) => Number(v.month.slice(0, 4)))])].toSorted((a, b) => b - a));
+	let members = $derived(platforms.filter((p) => p.portfolioId === portfolioId));
+	let scoped = $derived(members.filter((p) => platformFilter === 'all' || p.id === platformFilter));
+	let ids = $derived(scoped.map((p) => p.id));
+	let performance = $derived(periodPerformance(ids, valuations, movements, period));
+	let series = $derived(investmentSeries(ids, valuations, movements, year));
+	let accumulated = $derived(series.find((p) => p.month === period)?.index ?? null);
+	let baseDate = $derived(series.find((p) => p.index !== null)?.date ?? null);
+	let incoming = $derived(movements.filter((m) => m.context === 'own' && m.kind === 'investment' && ids.includes(m.platformId ?? '') && m.date.startsWith(period)).reduce((sum, m) => sum + m.amount, 0));
+	let operations = $derived([
+		...movements.filter((m) => m.context === 'own' && m.kind === 'investment' && ids.includes(m.platformId ?? '') && m.date.startsWith(`${year}-`)).map((m) => ({ id: m.id, platformId: m.platformId!, date: m.date, month: m.date.slice(0, 7), amount: m.amount, type: 'Aportación' })),
+		...valuations.filter((v) => ids.includes(v.platformId) && v.month.startsWith(`${year}-`)).map((v) => ({ ...v, id: `v-${v.platformId}-${v.date}`, type: 'Valoración' })),
 	].toSorted((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id)));
-	let replacing = $derived(action === 'valuation' && valuations.some((v) => v.portfolioId === portfolioId && v.date === date));
+	let action = $state<'portfolio' | 'platform' | 'contribution' | 'valuation'>('contribution');
+	let dialog: HTMLDialogElement;
+	let editingId = $state(''); let platformId = $state(''); let name = $state('');
+	let date = $state('2026-10-13'); let referenceMonth = $state(DEMO_MONTH);
+	let amount = $state(''); let account = $state('Cuenta principal'); let error = $state(''); let notice = $state('');
+	let replacing = $derived(action === 'valuation' && valuations.some((v) => v.platformId === platformId && v.date === date));
+	const percent = (value: number | null | undefined) => value === null || value === undefined ? 'No disponible' : `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2, signDisplay: 'exceptZero' }).format(value * 100)} %`;
 	const dateLabel = (value: string) => new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`));
-	function open(next: typeof action, id?: string) {
-		action = next;
-		portfolioId = id ?? (selected === 'all' ? portfolios[0]?.id ?? '' : selected);
-		date = '2026-10-13'; amount = ''; name = ''; account = 'Cuenta principal'; error = '';
+	function selectPortfolio() { platformFilter = 'all'; }
+	function open(next: typeof action, id = '') {
+		action = next; editingId = ''; name = ''; error = ''; amount = ''; account = 'Cuenta principal';
+		platformId = id || (platformFilter === 'all' ? members[0]?.id ?? '' : platformFilter);
+		referenceMonth = period;
+		date = period === DEMO_MONTH ? '2026-10-13' : new Date(Date.UTC(year, Number(monthNumber), 0)).toISOString().slice(0, 10);
+		if (next === 'portfolio' && id) { editingId = id; name = portfolios.find((p) => p.id === id)!.name; }
+		if (next === 'platform' && id) { editingId = id; name = platforms.find((p) => p.id === id)!.name; }
 		dialog.showModal();
 	}
-	function edit(value: Valuation) {
-		open('valuation', value.portfolioId); date = value.date;
+	function editValue(value: Valuation) {
+		open('valuation', value.platformId); date = value.date; referenceMonth = value.month;
 		amount = `${Math.trunc(value.amount / 100)},${String(value.amount % 100).padStart(2, '0')}`;
 	}
 	function save(event: SubmitEvent) {
 		event.preventDefault(); error = '';
 		try {
-			if (action === 'portfolio') oncreate(name);
+			if (action === 'portfolio') {
+				const id = editingId || crypto.randomUUID(); onportfolio({ id, name }); portfolioId = id; platformFilter = 'all';
+			} else if (action === 'platform') onplatform({ id: editingId || crypto.randomUUID(), portfolioId, name });
 			else {
 				const cents = action === 'valuation' && /^0(?:[,.]0{1,2})?$/.test(amount.trim()) ? 0 : parseAmount(amount);
-				if (cents === null) throw new Error('Introduce un importe válido con un máximo de dos decimales.');
-				if (action === 'contribution') oncontribute(portfolioId, date, cents, account);
-				else onvalue({ portfolioId, date, amount: cents });
+				if (cents === null) throw new Error('Introduce un importe válido con hasta dos decimales.');
+				if (action === 'contribution') oncontribute(platformId, date, cents, account);
+				else onvalue({ platformId, date, month: referenceMonth, amount: cents });
 			}
-			notice = action === 'portfolio' ? 'Cartera creada.' : action === 'contribution' ? 'Aportación registrada sin modificar el ahorro ordinario.' : 'Valoración guardada para la fecha indicada.';
-			dialog.close();
+			notice = 'Guardado en la demo. Los cambios duran hasta recargar.'; dialog.close();
 		} catch (caught) { error = caught instanceof Error ? caught.message : 'No se ha podido guardar.'; }
 	}
 </script>
 
+<div class="investment-toolbar">
+	<label>Cartera<select aria-label="Cartera de inversión" bind:value={portfolioId} onchange={selectPortfolio}>{#each portfolios as portfolio}<option value={portfolio.id}>{portfolio.name}</option>{/each}</select></label>
+	<label>Año<select aria-label="Año de inversiones" bind:value={year}>{#each years as value}<option value={value}>{value}</option>{/each}</select></label>
+	<label>Mes<select aria-label="Mes de inversiones" bind:value={monthNumber}>{#each historyPeriods(year) as item}<option value={item.month.slice(5)}>{item.label}</option>{/each}</select></label>
+</div>
+<div class="tabs investment-tabs" role="group" aria-label="Vistas de inversiones">{#each ['Resumen', 'Carteras', 'Plataformas', 'Histórico'] as view}<button class:active={tab === view} aria-pressed={tab === view} onclick={() => (tab = view)}>{view}</button>{/each}</div>
 <div class="investment-actions">
-	<button class="primary" onclick={() => open('contribution')} disabled={portfolios.length === 0}>Añadir aportación</button>
-	<button class="secondary" onclick={() => open('valuation')} disabled={portfolios.length === 0}>Actualizar saldo</button>
-	<button class="secondary" onclick={() => open('portfolio')}>Nueva cartera / plataforma</button>
+	<button class="primary" disabled={members.length === 0} onclick={() => open('contribution')}>Añadir aportación</button>
+	<button class="secondary" disabled={members.length === 0} onclick={() => open('valuation')}>Registrar saldo mensual</button>
 </div>
-{#if notice}<p class="context-notice" role="status">{notice} Los cambios duran hasta recargar.</p>{/if}
-<div class="investment-filter">
-	<label for="portfolio-filter">Ver cartera / plataforma</label>
-	<select id="portfolio-filter" bind:value={selected}>
-		<option value="all">Todas las carteras</option>
-		{#each portfolios as portfolio}<option value={portfolio.id}>{portfolio.name}</option>{/each}
-	</select>
-</div>
-<div class="metrics">
-	<article class="metric savings">
-		<span>Suma de últimas valoraciones</span><strong>{hasAllValues ? money(total) : latest.some((v) => v !== null) ? `${money(total)} · parcial` : 'Sin valoración'}</strong>
-		<small>Valores declarados; pueden tener fechas distintas.</small>
-	</article>
-	<article class="metric"><span>Aportaciones · octubre 2026</span><strong>{money(recentContributions)}</strong><small>Entradas de capital; no son gastos.</small></article>
-	<article class="metric"><span>Rentabilidad Modified Dietz</span><strong class="unavailable">No disponible</strong><small>Cálculo pendiente en esta maqueta.</small></article>
-</div>
-<div class="investment-portfolios">
-	{#each cards as portfolio}
-		{@const value = latestValuation(valuations, portfolio.id)}
-		{@const later = contributions.filter((m) => m.portfolioId === portfolio.id && (!value || m.date > value.date)).reduce((sum, m) => sum + m.amount, 0)}
-		<section class="panel investment-card">
-			<h2>{portfolio.name}</h2>
-			<p>Último saldo declarado</p>
-			<strong class="portfolio-value">{value ? money(value.amount) : 'Sin valoración'}</strong>
-			<p>{value ? `Valoración del ${dateLabel(value.date)}` : 'Añade una valoración para conocer su saldo.'}</p>
-			{#if later > 0}<p class="pending-value">{money(later)} de aportaciones sin valoración posterior. No están añadidas al saldo mostrado.</p>{/if}
-			<div class="investment-card-actions">
-				<button class="secondary" onclick={() => open('contribution', portfolio.id)}>Aportar</button>
-				<button class="secondary" onclick={() => open('valuation', portfolio.id)}>Actualizar saldo</button>
-				<button class="text-button" onclick={() => (selected = portfolio.id)}>Ver historial</button>
-			</div>
-		</section>
-	{/each}
-</div>
-<section class="panel investment-history">
-	<div class="panel-title"><div><h2>Aportaciones y valoraciones</h2><p>Fecha real de cada operación · datos ficticios</p></div></div>
-	{#each entries as entry (entry.id)}
-		<div class="investment-entry">
-			<div><strong>{entry.type} · {portfolios.find((p) => p.id === entry.portfolioId)?.name ?? 'Sin cartera asignada'}</strong><small>{dateLabel(entry.date)}</small></div>
-			<strong>{entry.type === 'Aportación' ? '+' : ''}{money(entry.amount)}</strong>
-			{#if entry.type === 'Valoración'}<button class="text-button" aria-label={`Editar valoración de ${portfolios.find((p) => p.id === entry.portfolioId)?.name} del ${entry.date}`} onclick={() => edit({ portfolioId: entry.portfolioId!, date: entry.date, amount: entry.amount })}>Editar</button>{/if}
-		</div>
-	{:else}<p class="investment-empty">Sin operaciones registradas para esta cartera.</p>{/each}
-	<div class="panel-footer">Una aportación mueve capital. Una valoración indica cuánto vale la cartera en una fecha y no mueve dinero. No se calculan todavía ganancias ni rentabilidades.</div>
-</section>
+{#if notice}<p class="context-notice" role="status">{notice}</p>{/if}
+{#if tab !== 'Carteras'}<label class="platform-filter">Ver plataforma<select aria-label="Plataforma de inversión" bind:value={platformFilter}><option value="all">Conjunto de la cartera</option>{#each members as platform}<option value={platform.id}>{platform.name}</option>{/each}</select></label>{/if}
 
-<dialog bind:this={dialog} class="entry-dialog" aria-label={action === 'portfolio' ? 'Nueva cartera' : action === 'contribution' ? 'Añadir aportación' : 'Actualizar saldo'}>
-	<div class="dialog-heading"><h2>{action === 'portfolio' ? 'Nueva cartera / plataforma' : action === 'contribution' ? 'Añadir aportación' : 'Actualizar saldo'}</h2><button class="secondary" onclick={() => dialog.close()}>Cerrar</button></div>
+{#if tab === 'Resumen'}
+	<div class="metrics investment-metrics">
+		<article class="metric savings"><span>Valor declarado · {period}</span><strong>{performance.complete ? money(performance.total) : performance.total > 0 ? `${money(performance.total)} · parcial` : 'Sin valorar'}</strong><small>{performance.complete ? `${scoped.length} plataforma(s) con valoración mensual` : 'Faltan saldos de plataformas; no equivalen a cero.'}</small></article>
+		<article class="metric"><span>Aportado en el mes</span><strong>{money(incoming)}</strong><small>No reduce el ahorro ordinario.</small></article>
+		<article class="metric"><span>Rentabilidad del periodo</span><strong class:expense-amount={(performance.result?.rate ?? 0) < 0}>{percent(performance.result?.rate)}</strong><small>Modified Dietz · flujos fechados</small></article>
+		<article class="metric"><span>Rentabilidad acumulada observada</span><strong class:expense-amount={(accumulated ?? 100) < 100}>{percent(accumulated === null ? null : accumulated / 100 - 1)}</strong><small>{baseDate ? `Desde ${dateLabel(baseDate)} hasta el cierre seleccionado.` : 'Falta una valoración inicial.'}</small></article>
+	</div>
+	<section class="panel period-explanation">
+		{#if performance.result}<strong>Resultado entre valoraciones: <span class:expense-amount={performance.result.gain < 0}>{money(performance.result.gain)}</span></strong><p>{dateLabel(performance.result.start)} → {dateLabel(performance.result.end)} · Valor final menos valor inicial y aportaciones del intervalo.</p>{:else}<strong>Rentabilidad no disponible</strong><p>{performance.reason}</p>{/if}
+		{#if period === DEMO_MONTH}<p>Octubre está en curso. La última valoración de ejemplo es del 12 de octubre.</p>{/if}
+	</section>
+	<div class="investment-graphs">
+		<InvestmentChart title="Cómo evoluciona el valor" labels={historyPeriods(year).map((p) => p.label.slice(0, 3))} series={[{ name: 'Valor declarado', color: '#426c56', values: series.map((p) => p.total) }]} />
+		<InvestmentChart title="Rentabilidad frente a tus referencias" base labels={historyPeriods(year).map((p) => p.label.slice(0, 3))} series={[{ name: 'Tu evolución', color: '#426c56', values: series.map((p) => p.index) }, { name: 'Teórico 5 % anual', color: '#a77d37', values: series.map((p) => p.five) }, { name: 'Teórico 9 % anual', color: '#687eab', values: series.map((p) => p.nine) }]} />
+	</div>
+	<p class="investment-hint">El total se calcula con todas las plataformas. Su rentabilidad se calcula con sus valores y aportaciones conjuntas, sin promediar porcentajes. Si sus fechas de cierre no coinciden, se muestran por separado y no se calcula rentabilidad conjunta.</p>
+{:else if tab === 'Carteras'}
+	<div class="investment-section-title"><h2>Tus carteras</h2><button class="secondary" onclick={() => open('portfolio')}>Nueva cartera</button></div>
+	<div class="investment-grid">{#each portfolios as portfolio}
+		{@const group = platforms.filter((p) => p.portfolioId === portfolio.id)}
+		{@const result = periodPerformance(group.map((p) => p.id), valuations, movements, period)}
+		<section class="panel investment-card"><h2>{portfolio.name}</h2><p>{group.length} plataformas · {period}</p><strong class="portfolio-value">{result.complete ? money(result.total) : 'Valoración incompleta'}</strong><p>Rentabilidad del periodo: {percent(result.result?.rate)}</p><p>{group.map((p) => p.name).join(' · ') || 'Añade su primera plataforma.'}</p><div class="investment-actions"><button class="secondary" onclick={() => { portfolioId = portfolio.id; platformFilter = 'all'; tab = 'Resumen'; }}>Ver resumen</button><button class="text-button" onclick={() => open('portfolio', portfolio.id)}>Editar cartera</button></div></section>
+	{/each}</div>
+{:else if tab === 'Plataformas'}
+	<div class="investment-section-title"><h2>Plataformas de la cartera</h2><button class="secondary" onclick={() => open('platform')}>Añadir plataforma</button></div>
+	<div class="investment-grid">{#each scoped as platform}
+		{@const value = monthlyValuation(valuations, platform.id, period)}
+		{@const result = periodPerformance([platform.id], valuations, movements, period)}
+		{@const later = movements.filter((m) => m.kind === 'investment' && m.platformId === platform.id && (!value || m.date > value.date) && m.date.startsWith(period)).reduce((sum, m) => sum + m.amount, 0)}
+		<section class="panel investment-card"><h2>{platform.name}</h2><p>{portfolios.find((p) => p.id === platform.portfolioId)?.name}</p><strong class="portfolio-value">{value ? money(value.amount) : 'Sin valoración mensual'}</strong><p>{value ? `Fecha real: ${dateLabel(value.date)} · referencia ${value.month}` : `Pendiente de introducir el saldo de ${period}.`}</p><p>Rentabilidad del periodo: <strong class:expense-amount={(result.result?.rate ?? 0) < 0}>{percent(result.result?.rate)}</strong></p>{#if result.result}<p>{dateLabel(result.result.start)} → {dateLabel(result.result.end)}</p>{/if}
+			{#if later > 0}<p class="pending-value">{money(later)} aportados sin valoración posterior; no se suman automáticamente al saldo.</p>{/if}
+			<div class="investment-actions"><button class="secondary" onclick={() => open('contribution', platform.id)}>Aportar</button><button class="secondary" onclick={() => open('valuation', platform.id)}>Registrar saldo</button><button class="text-button" onclick={() => open('platform', platform.id)}>Editar plataforma</button><button class="text-button" onclick={() => { platformFilter = platform.id; tab = 'Resumen'; }}>Ver gráficos</button></div>
+		</section>
+	{:else}<section class="panel investment-card"><p>No hay plataformas. Añade la primera para registrar aportaciones y saldos.</p></section>{/each}</div>
+{:else}
+	<section class="panel monthly-records"><div class="panel-title"><div><h2>Histórico mensual · {year}</h2><p>Una valoración efectiva por plataforma y mes: la de fecha más reciente.</p></div></div>
+		<div class="table-scroll"><table><thead><tr><th>Mes</th><th>Valor declarado</th><th>Rentabilidad del intervalo</th></tr></thead><tbody>{#each historyPeriods(year) as item}{@const result = periodPerformance(ids, valuations, movements, item.month)}<tr><td>{item.label}</td><td>{result.complete ? money(result.total) : 'Incompleto / sin valorar'}</td><td class:expense-amount={(result.result?.rate ?? 0) < 0}>{percent(result.result?.rate)}</td></tr>{/each}</tbody></table></div>
+	</section>
+	<section class="panel investment-history"><div class="panel-title"><div><h2>Aportaciones y valoraciones · {year}</h2><p>Fecha real y mes de referencia separados</p></div></div>
+		{#each operations as entry (entry.id)}<div class="investment-entry"><div><strong>{entry.type} · {platforms.find((p) => p.id === entry.platformId)?.name}</strong><small>{dateLabel(entry.date)}{entry.type === 'Valoración' ? ` · referencia ${entry.month}` : ''}</small></div><strong>{entry.type === 'Aportación' ? '+' : ''}{money(entry.amount)}</strong>{#if entry.type === 'Valoración'}<button class="text-button" aria-label={`Editar valoración de ${platforms.find((p) => p.id === entry.platformId)?.name} del ${entry.date}`} onclick={() => editValue(entry)}>Editar</button>{/if}</div>{:else}<p class="investment-hint">Sin operaciones para esta selección.</p>{/each}
+	</section>
+{/if}
+<p class="investment-hint">Demo con datos ficticios. Retiradas y traspasos todavía pendientes en esta interfaz. Las comparaciones del 5 % y 9 % son referencias, no cotizaciones ni previsiones.</p>
+
+<dialog bind:this={dialog} class="entry-dialog" aria-label={action === 'portfolio' ? 'Cartera' : action === 'platform' ? 'Plataforma' : action === 'contribution' ? 'Añadir aportación' : 'Registrar saldo mensual'}>
+	<div class="dialog-heading"><h2>{action === 'portfolio' ? (editingId ? 'Editar cartera' : 'Nueva cartera') : action === 'platform' ? (editingId ? 'Editar plataforma' : 'Nueva plataforma') : action === 'contribution' ? 'Añadir aportación' : 'Registrar saldo mensual'}</h2><button class="secondary" onclick={() => dialog.close()}>Cerrar</button></div>
 	<form onsubmit={save}>
-		{#if action === 'portfolio'}
-			<label>Nombre de la cartera / plataforma<input bind:value={name} required maxlength="60" placeholder="Ej.: Plataforma de fondos" /></label>
-		{:else}
-			<p class="form-hint">{action === 'contribution' ? 'Registra el capital cuando entra en la cartera. No cuenta como gasto.' : 'Introduce el valor total que muestra la plataforma en esta fecha. No se suma a los saldos anteriores.'}</p>
-			<label>Cartera / plataforma<select bind:value={portfolioId} required>{#each portfolios as portfolio}<option value={portfolio.id}>{portfolio.name}</option>{/each}</select></label>
+		{#if action === 'portfolio' || action === 'platform'}<label>Nombre<input bind:value={name} required maxlength="60" /></label>{#if action === 'platform'}<p class="form-hint">Pertenece a {portfolios.find((p) => p.id === portfolioId)?.name}. Sus saldos se agregarán a esta cartera.</p>{/if}
+		{:else}<p class="form-hint">{action === 'contribution' ? 'Registra cuándo entra el capital en la plataforma. No cuenta como gasto.' : 'Introduce el saldo total que muestra esta plataforma en la fecha real. Una valoración no mueve dinero.'}</p><label>Plataforma<select aria-label="Plataforma del registro" bind:value={platformId} required>{#each members as platform}<option value={platform.id}>{platform.name}</option>{/each}</select></label>
 			<div class="form-columns"><label>Fecha real<input type="date" bind:value={date} required /></label><label>{action === 'contribution' ? 'Aportación (€)' : 'Saldo total (€)'}<input bind:value={amount} inputmode="decimal" placeholder="0,00" required /></label></div>
-			{#if action === 'contribution'}<label>Cuenta de origen<select bind:value={account}><option>Cuenta principal</option><option>Fondo de emergencia</option></select></label>{/if}
-			{#if replacing}<p class="form-hint" role="status">Ya hay una valoración para esta cartera y fecha. Se sustituirá por el importe que guardes.</p>{/if}
+			{#if action === 'valuation'}<label>Mes de referencia<input type="month" bind:value={referenceMonth} required /></label>{:else}<label>Cuenta de origen<select bind:value={account}><option>Cuenta principal</option><option>Fondo de emergencia</option></select></label>{/if}
+			{#if replacing}<p class="form-hint" role="status">Ya existe una valoración para esta plataforma y fecha. Se sustituirá; no se duplicará.</p>{/if}
 		{/if}
-		{#if error}<p class="form-error" role="alert">{error}</p>{/if}
-		<div class="dialog-actions"><button class="secondary" type="button" onclick={() => dialog.close()}>Cancelar</button><button class="primary" type="submit">{replacing ? 'Sustituir valoración' : 'Guardar'}</button></div>
+		{#if error}<p class="form-error" role="alert">{error}</p>{/if}<div class="dialog-actions"><button class="secondary" type="button" onclick={() => dialog.close()}>Cancelar</button><button class="primary" type="submit">{replacing ? 'Sustituir valoración' : 'Guardar'}</button></div>
 	</form>
 </dialog>
 
 <style>
-	.investment-actions, .investment-card-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
-	.investment-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 24px; }
-	.investment-filter select { padding: 12px; border: 1px solid #cbd9c0; border-radius: 6px; background: white; color: inherit; font: inherit; max-width: 100%; }
-	.investment-portfolios { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-bottom: 24px; }
-	.investment-card { padding: 24px; }
-	.investment-card h2 { font-size: 18px; overflow-wrap: anywhere; }
-	.investment-card p { margin: 14px 0; font-size: 12px; line-height: 1.7; }
+	.investment-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.investment-toolbar, .investment-actions, .investment-section-title { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 24px; }
+	.investment-toolbar label, .platform-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+	.investment-toolbar select, .platform-filter select { padding: 11px; border: 1px solid #cbd9c0; border-radius: 6px; background: white; color: inherit; font: inherit; max-width: 100%; }
+	.platform-filter { margin-bottom: 24px; }
+	.investment-tabs { overflow-x: auto; white-space: nowrap; }
+	.investment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-bottom: 24px; }
+	.investment-card, .period-explanation { padding: 24px; }
+	.investment-card h2, .investment-section-title h2 { font-size: 18px; overflow-wrap: anywhere; }
+	.investment-card p, .period-explanation p { margin: 12px 0; font-size: 12px; line-height: 1.7; }
+	.investment-card .investment-actions { margin: 20px 0 0; }
 	.portfolio-value { display: block; font-size: 28px; font-variant-numeric: tabular-nums; }
-	.investment-card-actions { margin: 20px 0 0; }
 	.pending-value { padding: 12px; background: #fbf0d9; color: #795116; border-radius: 6px; }
-	.investment-entry { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 18px 24px; border-top: 1px solid #e8ebe5; }
+	.investment-graphs { display: grid; gap: 24px; margin-top: 24px; }
+	.investment-hint { font-size: 12px; line-height: 1.8; margin: 20px 0; }
+	.investment-entry { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 18px 24px; border-top: 1px solid #e8ebe5; }
 	.investment-entry > div { flex: 1; min-width: 160px; }
 	.investment-entry strong { font-size: 13px; }
 	.investment-entry small { display: block; margin-top: 8px; }
-	.investment-empty { padding: 24px; }
-	@media (max-width: 680px) { .investment-portfolios { grid-template-columns: 1fr; } .investment-actions > button { flex: 1 1 145px; } .investment-card, .investment-entry { padding: 18px; } }
+	.monthly-records { margin-bottom: 24px; }
+	.table-scroll { overflow-x: auto; }
+	table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+	th, td { padding: 14px 24px; border-top: 1px solid #e8ebe5; white-space: nowrap; }
+	.investment-section-title { justify-content: space-between; }
+	@media (max-width: 680px) { .investment-grid { grid-template-columns: 1fr; } .investment-actions > button { flex: 1 1 145px; } .investment-card, .investment-entry, .period-explanation { padding: 18px; } .investment-toolbar > label:first-child { width: 100%; } .investment-toolbar > label:first-child select { flex: 1; min-width: 0; } }
 </style>

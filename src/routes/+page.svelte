@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Investments from '#lib/components/Investments.svelte';
-	import { initialPortfolios, initialValuations, createPortfolio, addContribution, saveValuation } from '#lib/demo/investments.ts';
+	import { initialPortfolios, initialPlatforms, initialValuations, createPortfolio, savePlatform, addContribution, saveValuation } from '#lib/demo/investments.ts';
 	import Icon from '#lib/components/Icon.svelte';
 	import FatherBudgets from '#lib/components/FatherBudgets.svelte';
 	import FatherHistory from '#lib/components/FatherHistory.svelte';
@@ -40,6 +40,7 @@
 	let movements = $state(initialMovements());
 	let portfolios = $state(initialPortfolios());
 	let valuations = $state(initialValuations());
+	let platforms = $state(initialPlatforms());
 	let budgets = $state(initialBudgets());
 	let entryContext = $state<Context>('own');
 	let editingId = $state<string | null>(null);
@@ -150,6 +151,7 @@
 		movements = initialMovements();
 		portfolios = initialPortfolios();
 		valuations = initialValuations();
+		platforms = initialPlatforms();
 		budgets = initialBudgets();
 		query = '';
 		filter = 'all';
@@ -820,12 +822,13 @@
 						</p>
 					</section>{/if}
 			{:else if page === 'investments'}
-				<Investments {movements} {portfolios} {valuations}
-					oncreate={(name) => { portfolios = createPortfolio(portfolios, { id: crypto.randomUUID(), name }, role); }}
-					oncontribute={(portfolioId, date, amount, account) => {
-						movements = addContribution(movements, portfolios, { id: crypto.randomUUID(), portfolioId, date, amount, account }, role);
+				<Investments {movements} {portfolios} {platforms} {valuations}
+					onportfolio={(value) => { portfolios = createPortfolio(portfolios, value, role); }}
+					onplatform={(value) => { platforms = savePlatform(platforms, portfolios, value, role); }}
+					oncontribute={(platformId, date, amount, account) => {
+						movements = addContribution(movements, platforms, { id: crypto.randomUUID(), platformId, date, amount, account }, role);
 					}}
-					onvalue={(value) => { valuations = saveValuation(valuations, portfolios, value, role); }} />
+					onvalue={(value) => { valuations = saveValuation(valuations, platforms, value, role); }} />
 			{:else if page === 'history'}
 				<FatherHistory {movements} context="own" onview={(period) => {
 					month = period;

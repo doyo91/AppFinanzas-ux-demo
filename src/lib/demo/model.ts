@@ -12,6 +12,7 @@ export type Movement = {
 	account: string;
 	destination?: string;
 	portfolioId?: string;
+	platformId?: string;
 	fixed: boolean;
 };
 
@@ -149,6 +150,7 @@ const seeds: Movement[] = [
 	{
 		id: 'o4',
 		portfolioId: 'long-term',
+		platformId: 'funds',
 		context: 'own',
 		date: '2026-10-04',
 		concept: 'Aportación mensual',
@@ -365,6 +367,13 @@ function historicalMovements(): Movement[] {
 			add(17, 'Gasolina o desplazamientos', 'Transporte', 2400 + monthIndex * 320);
 			add(21, 'Productos para casa', 'Otros', 2150 + monthIndex * 275);
 			add(26, 'Cine y ocio', 'Ocio', 1900 + monthIndex * 410);
+			if (!father) {
+				for (const [platformId, day, amount] of [['funds', 5, 20000], ['broker', 15, 10000], ['crypto', 20, 5000]] as const) {
+					add(day, 'Aportación de ejemplo', 'Inversión', amount, false, 'investment');
+					items.at(-1)!.platformId = platformId;
+					items.at(-1)!.portfolioId = 'long-term';
+				}
+			}
 			if (month === '2026-07') add(19, 'Reparación del coche', 'Transporte', father ? 68000 : 92000);
 			if (month === '2026-08') add(23, 'Escapada de verano', 'Ocio', father ? 12500 : 48000);
 			if (month === '2026-09') add(18, 'Revisión dental', 'Salud', father ? 14500 : 9500);
