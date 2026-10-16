@@ -75,3 +75,29 @@
 		presupuesto asignado.
 	</div>
 </section>
+
+<style>
+	.budget-warning .budget-status,
+	.budget-exceeded .budget-status {
+		padding: 6px 10px;
+		border-radius: 6px;
+		font-weight: 700;
+	}
+	.budget-warning .budget-status {
+		color: #795116;
+		background: #fae9c4;
+	}
+	.budget-exceeded {
+		border-color: #d47474;
+		border-left: 5px solid #b32626;
+	}
+	.budget-exceeded .budget-status {
+		color: #fff;
+		background: #b32626;
+	}
+	.budget-exceeded > p strong,
+	.budget-exceeded .budget-remaining strong {
+		color: #a72121;
+		font-weight: 800;
+	}
+</style>
