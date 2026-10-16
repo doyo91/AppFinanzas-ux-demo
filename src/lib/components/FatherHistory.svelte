@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		money,
+		DEMO_PERIODS,
 		summarize,
 		categorySpend,
 		categories,
@@ -12,18 +13,11 @@
 		context = 'father',
 	}: { movements: Movement[]; context?: Context } = $props();
 	let selectedMonth = $state('2026-10');
-	const periods = [
-		{ month: '2026-08', label: 'Agosto' },
-		{ month: '2026-09', label: 'Septiembre' },
-		{ month: '2026-10', label: 'Octubre' },
-	];
 	let history = $derived(
-		periods
-			.filter((p) => context === 'father' || p.month !== '2026-08')
-			.map((period) => ({
-				...period,
-				...summarize(movements, context, period.month),
-			})),
+		DEMO_PERIODS.map((period) => ({
+			...period,
+			...summarize(movements, context, period.month),
+		})),
 	);
 	let scale = $derived(
 		Math.max(
@@ -60,6 +54,7 @@
 	</div>
 	<div
 		class="monthly-chart"
+		style={`grid-template-columns:repeat(${history.length}, minmax(100px, 1fr));overflow-x:auto`}
 		role="group"
 		aria-label="Seleccionar mes del histórico"
 	>
@@ -101,7 +96,7 @@
 			</div>
 			<div>
 				<dt>Resultado del mes</dt>
-				<dd>{money(selected.savings)}</dd>
+				<dd class:expense-amount={selected.savings < 0}>{money(selected.savings)}</dd>
 			</div>
 		</dl>
 	</div>
@@ -121,13 +116,10 @@
 		{#if breakdown.length === 0}<p>
 				No hay gastos registrados en este mes de la demo.
 			</p>{/if}
-		{#if selectedMonth !== '2026-10'}<small
-				>Los ejemplos anteriores contienen gastos resumidos en «Otros»; no se
-				inventa su reparto.</small
-			>{/if}
+
 	</section>
 	<div class="panel-footer">
-		Toca un mes para ver sus importes. Octubre está en curso: no lo compares
+		Desliza el gráfico para ver todos los meses y toca uno para ver sus importes. Octubre está en curso: no lo compares
 		como si estuviera completo. El resultado no es el saldo bancario ni el
 		disponible prudente.
 	</div>

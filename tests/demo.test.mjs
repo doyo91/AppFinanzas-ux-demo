@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
 	fatherBudgets,
+	DEMO_PERIODS,
 	categorySpend,
 	initialMovements,
 	parseAmount,
@@ -90,7 +91,7 @@ test('budgets are isolated by month and context; unset is not zero; father canno
 test('monthly category chart reconciles to expense total for each context', () => {
 	const data = initialMovements();
 	for (const context of ['own', 'father'])
-		for (const month of ['2026-08', '2026-09', '2026-10']) {
+		for (const { month } of DEMO_PERIODS) {
 			const names = new Set(
 				data
 					.filter((m) => m.context === context && m.kind === 'expense')
@@ -127,8 +128,8 @@ test('ordinary savings exclude internal transfers and investment contributions',
 test('context and month selection never aggregate unrelated movements', () => {
 	const data = initialMovements();
 	assert.equal(summarize(data, 'father', '2026-10').income, 125000);
-	assert.equal(summarize(data, 'own', '2026-09').expenses, 154300);
-	assert.equal(summarize(data, 'own', '2026-08').rate, null);
+	assert.equal(summarize(data, 'own', '2026-09').expenses, 155085);
+	assert.equal(summarize(data, 'own', '2026-04').rate, null);
 });
 
 test('budget notices use approved boundaries and distinguish missing budgets', () => {
@@ -157,8 +158,8 @@ test('father budget screen distinguishes exceeded leisure and preventive groceri
 
 test('father monthly chart derives independent months, not cumulative or admin totals', () => {
 	const movements = initialMovements();
-	assert.equal(summarize(movements, 'father', '2026-08').expenses, 98000);
-	assert.equal(summarize(movements, 'father', '2026-09').savings, 30500);
+	assert.equal(summarize(movements, 'father', '2026-08').expenses, 120604);
+	assert.equal(summarize(movements, 'father', '2026-09').savings, 3615);
 	assert.equal(summarize(movements, 'father', '2026-10').expenses, 88750);
 	assert.equal(summarize(movements, 'own', '2026-10').expenses, 101000);
 });
@@ -184,4 +185,23 @@ test('reset returns independent data and emergency transfers are neutral for sav
 	});
 	assert.equal(emergencyBalance(reset), 425000);
 	assert.deepEqual(summarize(reset, 'own', '2026-10'), before);
+});
+
+
+test('six synthetic months are reproducible, detailed and have unique valid movements', () => {
+	const data = initialMovements();
+	assert.deepEqual(data, initialMovements());
+	assert.equal(new Set(data.map((m) => m.id)).size, data.length);
+	for (const movement of data) {
+		assert.ok(Number.isSafeInteger(movement.amount) && movement.amount > 0);
+		assert.equal(new Date(movement.date).toISOString().slice(0, 10), movement.date);
+	}
+	for (const context of ['own', 'father']) {
+		for (const { month } of DEMO_PERIODS.slice(0, -1)) {
+			const entries = data.filter((m) => m.context === context && m.date.startsWith(month));
+			assert.ok(entries.length >= 20);
+			assert.ok(new Set(entries.filter((m) => m.kind === 'expense').map((m) => m.category)).size >= 6);
+		}
+	}
+	assert.ok(summarize(data, 'father', '2026-07').savings < 0);
 });

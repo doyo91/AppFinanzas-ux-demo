@@ -15,6 +15,14 @@ export type Movement = {
 };
 
 export const DEMO_MONTH = '2026-10';
+export const DEMO_PERIODS = [
+	{ month: '2026-05', label: 'Mayo' },
+	{ month: '2026-06', label: 'Junio' },
+	{ month: '2026-07', label: 'Julio' },
+	{ month: '2026-08', label: 'Agosto' },
+	{ month: '2026-09', label: 'Septiembre' },
+	{ month: DEMO_MONTH, label: 'Octubre' },
+];
 export type Budget = {
 	context: Context;
 	month: string;
@@ -24,7 +32,7 @@ export type Budget = {
 };
 export function initialBudgets(): Budget[] {
 	return [
-		...['2026-09', '2026-10'].flatMap((month) =>
+		...DEMO_PERIODS.flatMap(({ month }) =>
 			budgets.map((b) => ({ ...b, context: 'own' as const, month })),
 		),
 		...fatherBudgets.map((b) => ({
@@ -74,7 +82,7 @@ export function setBudget(
 	if (
 		role !== 'admin' ||
 		!categories.includes(category) ||
-		!/^2026-(08|09|10)$/.test(month) ||
+		!DEMO_PERIODS.some((period) => period.month === month) ||
 		(amount !== null &&
 			(!Number.isSafeInteger(amount) || amount <= 0 || amount > 100000000))
 	)
@@ -216,39 +224,6 @@ const seeds: Movement[] = [
 		fixed: false,
 	},
 	{
-		id: 'o11',
-		context: 'own',
-		date: '2026-09-01',
-		concept: 'Nómina',
-		amount: 245000,
-		kind: 'income',
-		category: 'Trabajo',
-		account: 'Cuenta principal',
-		fixed: false,
-	},
-	{
-		id: 'o12',
-		context: 'own',
-		date: '2026-09-02',
-		concept: 'Alquiler',
-		amount: 72000,
-		kind: 'expense',
-		category: 'Vivienda',
-		account: 'Cuenta principal',
-		fixed: true,
-	},
-	{
-		id: 'o13',
-		context: 'own',
-		date: '2026-09-20',
-		concept: 'Otros gastos del mes · ejemplo',
-		amount: 82300,
-		kind: 'expense',
-		category: 'Otros',
-		account: 'Cuenta principal',
-		fixed: false,
-	},
-	{
 		id: 'f1',
 		context: 'father',
 		date: '2026-10-01',
@@ -317,7 +292,11 @@ const seeds: Movement[] = [
 ];
 
 export function initialMovements(): Movement[] {
-	return [...seeds, ...fatherHistorySeeds].map((movement) => ({ ...movement }));
+	return [
+		...seeds.filter((movement) => movement.date.startsWith(DEMO_MONTH)),
+		...fatherHistorySeeds.filter((movement) => movement.date.startsWith(DEMO_MONTH)),
+		...historicalMovements(),
+	].map((movement) => ({ ...movement }));
 }
 
 export const fatherBudgets = [
@@ -351,51 +330,46 @@ const fatherHistorySeeds: Movement[] = [
 		account: 'Cuenta principal',
 		fixed: false,
 	},
-	{
-		id: 'f9',
-		context: 'father',
-		date: '2026-09-01',
-		concept: 'Pensión',
-		amount: 125000,
-		kind: 'income',
-		category: 'Pensión',
-		account: 'Cuenta principal',
-		fixed: false,
-	},
-	{
-		id: 'f10',
-		context: 'father',
-		date: '2026-09-30',
-		concept: 'Gastos del mes resumidos · ejemplo',
-		amount: 94500,
-		kind: 'expense',
-		category: 'Otros',
-		account: 'Cuenta principal',
-		fixed: false,
-	},
-	{
-		id: 'f11',
-		context: 'father',
-		date: '2026-08-01',
-		concept: 'Pensión',
-		amount: 125000,
-		kind: 'income',
-		category: 'Pensión',
-		account: 'Cuenta principal',
-		fixed: false,
-	},
-	{
-		id: 'f12',
-		context: 'father',
-		date: '2026-08-31',
-		concept: 'Gastos del mes resumidos · ejemplo',
-		amount: 98000,
-		kind: 'expense',
-		category: 'Otros',
-		account: 'Cuenta principal',
-		fixed: false,
-	},
+
 ];
+
+// Reproducible synthetic months: recurring bills, everyday purchases and occasional expenses.
+function historicalMovements(): Movement[] {
+	return DEMO_PERIODS.filter((period) => period.month !== DEMO_MONTH).flatMap(
+		({ month }, monthIndex) => (['own', 'father'] as const).flatMap((context) => {
+			const father = context === 'father';
+			const items: Movement[] = [];
+			function add(day: number, concept: string, category: string, amount: number,
+				fixed = false, kind: Kind = 'expense') {
+				items.push({
+					id: `demo-${context}-${month}-${items.length}`,
+					context, date: `${month}-${String(day).padStart(2, '0')}`,
+					concept, category, amount, fixed, kind,
+					account: father || fixed || kind !== 'expense' ? 'Cuenta principal' : 'Tarjeta',
+				});
+			}
+			add(1, father ? 'Pensión' : 'Nómina', father ? 'Pensión' : 'Trabajo', father ? 125000 : 245000, false, 'income');
+			add(2, father ? 'Vivienda' : 'Alquiler', 'Vivienda', father ? 48000 : 72000, true);
+			add(5, 'Internet y móvil', 'Servicios', father ? 2990 : 4990, true);
+			add(8, 'Luz', 'Servicios', 4800 + monthIndex * 430, true);
+			add(6, 'Abono de transporte', 'Transporte', father ? 1500 : 4200, true);
+			for (let week = 0; week < 4; week++) {
+				const day = 3 + week * 7;
+				add(day, 'Supermercado', 'Alimentación', (father ? 4200 : 5700) + ((monthIndex * 631 + week * 457) % 2500));
+				add(day + 1, 'Panadería y frutería', 'Alimentación', 850 + ((monthIndex * 97 + week * 163) % 1100));
+				add(day + 2, week % 2 === 0 ? 'Café y merienda' : 'Comida fuera', 'Ocio', (father ? 1100 : 2100) + ((monthIndex * 311 + week * 571) % 2200));
+			}
+			add(12, 'Farmacia', 'Salud', 1875 + monthIndex * 390);
+			add(17, 'Gasolina o desplazamientos', 'Transporte', 2400 + monthIndex * 320);
+			add(21, 'Productos para casa', 'Otros', 2150 + monthIndex * 275);
+			add(26, 'Cine y ocio', 'Ocio', 1900 + monthIndex * 410);
+			if (month === '2026-07') add(19, 'Reparación del coche', 'Transporte', father ? 68000 : 92000);
+			if (month === '2026-08') add(23, 'Escapada de verano', 'Ocio', father ? 12500 : 48000);
+			if (month === '2026-09') add(18, 'Revisión dental', 'Salud', father ? 14500 : 9500);
+			return items;
+		}),
+	);
+}
 
 export function parseAmount(input: string): number | null {
 	const normalized = input.trim().replace(',', '.');

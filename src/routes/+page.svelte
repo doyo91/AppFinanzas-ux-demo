@@ -18,6 +18,7 @@
 		saveFatherExpense,
 		type Context,
 		DEMO_MONTH,
+		DEMO_PERIODS,
 		type Movement,
 		type Kind,
 	} from '#lib/demo/model.ts';
@@ -62,10 +63,9 @@
 		transfer: 'Transferencia',
 		investment: 'Aportación',
 	};
-	const monthLabels: Record<string, string> = {
-		'2026-10': 'Octubre 2026',
-		'2026-09': 'Septiembre 2026',
-	};
+	const monthLabels: Record<string, string> = Object.fromEntries(
+		DEMO_PERIODS.toReversed().map(({ month, label }) => [month, `${label} 2026`]),
+	);
 	const titles: Record<Page, string> = {
 		home: 'Tu dinero, con perspectiva.',
 		movements: 'Cada movimiento cuenta.',
@@ -210,18 +210,11 @@
 			return;
 		}
 		if (
-			!(
-				entryContext === 'father'
-					? /^2026-(08|09|10)-\d{2}$/
-					: /^2026-(09|10)-\d{2}$/
-			).test(date) ||
+			!DEMO_PERIODS.some((period) => date.startsWith(`${period.month}-`)) ||
 			Number.isNaN(Date.parse(date)) ||
 			new Date(date).toISOString().slice(0, 10) !== date
 		) {
-			error =
-				entryContext === 'father'
-					? 'Elige una fecha válida de agosto a octubre de 2026 para esta demo.'
-					: 'Elige una fecha válida de septiembre u octubre de 2026 para esta demo.';
+			error = 'Elige una fecha válida de mayo a octubre de 2026 para esta demo.';
 			return;
 		}
 		if (
@@ -787,7 +780,7 @@
 								<h2>Lo que has gastado</h2>
 								<p>
 									{role === 'admin'
-										? 'Gastos de agosto a octubre · abre el detalle para editar'
+										? 'Gastos de mayo a octubre · abre el detalle para editar'
 										: 'Movimientos registrados en octubre'}
 								</p>
 							</div>
@@ -862,12 +855,12 @@
 				<div class="context-notice">
 					<Icon name="calendar" />
 					<p>
-						Octubre está en curso y septiembre contiene un conjunto de ejemplo
-						resumido. No son periodos comparables completos.
+						Mayo a septiembre contienen meses completos de ejemplo. Octubre está en curso;
+						no lo compares como si estuviera completo.
 					</p>
 				</div>
 				<div class="history-grid">
-					{#each ['2026-10', '2026-09'] as period}{@const result = summarize(
+					{#each DEMO_PERIODS.toReversed() as { month: period }}{@const result = summarize(
 							movements,
 							'own',
 							period,
@@ -1055,7 +1048,7 @@
 					id="date"
 					bind:value={date}
 					type="date"
-					min={entryContext === 'father' ? '2026-08-01' : '2026-09-01'}
+					min="2026-05-01"
 					max="2026-10-31"
 					required
 				/></label
