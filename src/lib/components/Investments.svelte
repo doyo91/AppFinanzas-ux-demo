@@ -21,6 +21,13 @@
 	let ids = $derived(scoped.map((p) => p.id));
 	let performance = $derived(periodPerformance(ids, valuations, movements, period));
 	let series = $derived(investmentSeries(ids, valuations, movements, year));
+	let recordedMonths = $derived(historyPeriods(year).filter((item) =>
+		valuations.some((v) => ids.includes(v.platformId) && v.month === item.month) ||
+		movements.some((m) => m.context === 'own' && m.kind === 'investment' && ids.includes(m.platformId ?? '') && m.date.startsWith(item.month))
+	));
+	let chartSeries = $derived(series.filter((item) => recordedMonths.some((period) => period.month === item.month)));
+	let chartPositions = $derived(chartSeries.map((item) => Number(item.month.slice(5))));
+	let chartLabels = $derived(chartSeries.map((item) => historyPeriods(year).find((period) => period.month === item.month)!.label.slice(0, 3)));
 	let accumulated = $derived(series.find((p) => p.month === period)?.index ?? null);
 	let baseDate = $derived(series.find((p) => p.index !== null)?.date ?? null);
 	let incoming = $derived(movements.filter((m) => m.context === 'own' && m.kind === 'investment' && ids.includes(m.platformId ?? '') && m.date.startsWith(period)).reduce((sum, m) => sum + m.amount, 0));
@@ -92,8 +99,8 @@
 		{#if period === DEMO_MONTH}<p>Octubre está en curso. La última valoración es del 12 de octubre.</p>{/if}
 	</section>
 	<div class="investment-graphs">
-		<InvestmentChart title="Cómo evoluciona el valor" labels={historyPeriods(year).map((p) => p.label.slice(0, 3))} series={[{ name: 'Valor declarado', color: '#426c56', values: series.map((p) => p.total) }]} />
-		<InvestmentChart title="Rentabilidad frente a tus referencias" base labels={historyPeriods(year).map((p) => p.label.slice(0, 3))} series={[{ name: 'Tu evolución', color: '#426c56', values: series.map((p) => p.index) }, { name: 'Teórico 5 % anual', color: '#a77d37', values: series.map((p) => p.five) }, { name: 'Teórico 9 % anual', color: '#687eab', values: series.map((p) => p.nine) }]} />
+		<InvestmentChart title="Cómo evoluciona el valor" labels={chartLabels} positions={chartPositions} series={[{ name: 'Valor declarado', color: '#426c56', values: chartSeries.map((p) => p.total) }]} />
+		<InvestmentChart title="Rentabilidad frente a tus referencias" base labels={chartLabels} positions={chartPositions} series={[{ name: 'Tu evolución', color: '#426c56', values: chartSeries.map((p) => p.index) }, { name: 'Teórico 5 % anual', color: '#a77d37', values: chartSeries.map((p) => p.five) }, { name: 'Teórico 9 % anual', color: '#687eab', values: chartSeries.map((p) => p.nine) }]} />
 	</div>
 	<p class="investment-hint">El total se calcula con todas las plataformas. Su rentabilidad se calcula con sus valores y aportaciones conjuntas, sin promediar porcentajes. Si sus fechas de cierre no coinciden, se muestran por separado y no se calcula rentabilidad conjunta.</p>
 {:else if tab === 'Carteras'}
@@ -116,7 +123,7 @@
 	{:else}<section class="panel investment-card"><p>No hay plataformas. Añade la primera para registrar aportaciones y saldos.</p></section>{/each}</div>
 {:else}
 	<section class="panel monthly-records"><div class="panel-title"><div><h2>Histórico mensual · {year}</h2><p>Una valoración efectiva por plataforma y mes: la de fecha más reciente.</p></div></div>
-		<div class="table-scroll"><table><thead><tr><th>Mes</th><th>Valor declarado</th><th>Rentabilidad del intervalo</th></tr></thead><tbody>{#each historyPeriods(year) as item}{@const result = periodPerformance(ids, valuations, movements, item.month)}<tr><td>{item.label}</td><td>{result.complete ? money(result.total) : 'Incompleto / sin valorar'}</td><td class:expense-amount={(result.result?.rate ?? 0) < 0}>{percent(result.result?.rate)}</td></tr>{/each}</tbody></table></div>
+		<div class="table-scroll"><table><thead><tr><th>Mes</th><th>Valor declarado</th><th>Rentabilidad del intervalo</th></tr></thead><tbody>{#each recordedMonths as item}{@const result = periodPerformance(ids, valuations, movements, item.month)}<tr><td>{item.label}</td><td>{result.complete ? money(result.total) : 'Incompleto / sin valorar'}</td><td class:expense-amount={(result.result?.rate ?? 0) < 0}>{percent(result.result?.rate)}</td></tr>{:else}<tr><td colspan="3">Sin datos registrados en este año.</td></tr>{/each}</tbody></table></div>
 	</section>
 	<section class="panel investment-history"><div class="panel-title"><div><h2>Aportaciones y valoraciones · {year}</h2><p>Fecha real y mes de referencia separados</p></div></div>
 		{#each operations as entry (entry.id)}<div class="investment-entry"><div><strong>{entry.type} · {platforms.find((p) => p.id === entry.platformId)?.name}</strong><small>{dateLabel(entry.date)}{entry.type === 'Valoración' ? ` · referencia ${entry.month}` : ''}</small></div><strong>{entry.type === 'Aportación' ? '+' : ''}{money(entry.amount)}</strong>{#if entry.type === 'Valoración'}<button class="text-button" aria-label={`Editar valoración de ${platforms.find((p) => p.id === entry.platformId)?.name} del ${entry.date}`} onclick={() => editValue(entry)}>Editar</button>{/if}</div>{:else}<p class="investment-hint">Sin operaciones para esta selección.</p>{/each}

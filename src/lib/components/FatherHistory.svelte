@@ -27,7 +27,7 @@
 		chart?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
 	});
 	let history = $derived(
-		historyPeriods(selectedYear).map((period) => ({
+		historyPeriods(selectedYear).filter((period) => movements.some((m) => m.context === context && m.date.startsWith(period.month))).map((period) => ({
 			...period,
 			...summarize(movements, context, period.month),
 		})),
@@ -39,8 +39,13 @@
 		),
 	);
 	let selected = $derived(
-		history.find((period) => period.month === selectedMonth)!,
+		history.find((period) => period.month === selectedMonth),
 	);
+	$effect(() => {
+		if (history.length && !history.some((period) => period.month === selectedMonth)) {
+			monthNumber = history[history.length - 1].month.slice(5);
+		}
+	});
 	let hasMovements = $derived(movements.some((m) => m.context === context && m.date.startsWith(selectedMonth)));
 	let hasYearMovements = $derived(movements.some((m) => m.context === context && m.date.startsWith(`${selectedYear}-`)));
 	let breakdown = $derived(
@@ -110,7 +115,7 @@
 			</button>
 		{/each}
 	</div>
-	<div class="selected-month" aria-live="polite">
+	{#if selected}<div class="selected-month" aria-live="polite">
 		<h3>{selected.label} {selectedYear}</h3>
 		{#if !hasMovements}<p class="history-empty" role="status">Sin movimientos registrados en este mes.</p>{:else}
 		<dl>
@@ -150,7 +155,7 @@
 				No hay gastos registrados en este mes.
 			</p>{/if}
 
-	</section>
+	</section>{/if}
 	<div class="panel-footer">
 		Desliza el gráfico para ver todos los meses y toca uno para ver sus importes. El mes en curso no debe compararse como si estuviera completo. El resultado no es el saldo bancario ni el
 		disponible prudente.

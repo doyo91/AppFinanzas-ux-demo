@@ -1,5 +1,5 @@
 <script lang="ts">
-	let { labels, series, base = false, title }: { labels: string[]; series: { name: string; color: string; values: (number | null)[] }[]; base?: boolean; title: string } = $props();
+	let { labels, series, positions, base = false, title }: { labels: string[]; positions?: number[]; series: { name: string; color: string; values: (number | null)[] }[]; base?: boolean; title: string } = $props();
 	let values = $derived(series.flatMap((s) => s.values.filter((v): v is number => v !== null)));
 	let minimum = $derived(Math.min(100, ...values));
 	let maximum = $derived(Math.max(100, ...values));
@@ -8,7 +8,7 @@
 	let high = $derived(base ? maximum + padding : Math.max(1, ...values) * 1.05);
 	let ticks = $derived([0, 1, 2, 3].map((tick) => low + ((high - low) * tick) / 3)
 		.filter((value) => !base || Math.abs(value - 100) > (high - low) * 0.08));
-	const x = (i: number) => 64 + (i * 660) / Math.max(1, labels.length - 1);
+	const x = (i: number) => positions && positions.length > 1 ? 64 + ((positions[i] - positions[0]) * 660) / (positions[positions.length - 1] - positions[0]) : 64 + (i * 660) / Math.max(1, labels.length - 1);
 	const y = (value: number) => 205 - ((value - low) * 175) / (high - low);
 	const label = (v: number) => base
 		? `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2, signDisplay: 'exceptZero' }).format(Math.abs(v - 100) < 0.005 ? 0 : v - 100)} %`
@@ -30,7 +30,7 @@
 			{#each series as item}
 				{#each item.values as value, i}
 					{#if value !== null}
-						{#if i > 0 && item.values[i - 1] !== null}<line x1={x(i - 1)} y1={y(item.values[i - 1]!)} x2={x(i)} y2={y(value)} stroke={item.color} stroke-width="2.5" />{/if}
+						{#if i > 0 && (!positions || positions[i] - positions[i - 1] === 1) && item.values[i - 1] !== null}<line x1={x(i - 1)} y1={y(item.values[i - 1]!)} x2={x(i)} y2={y(value)} stroke={item.color} stroke-width="2.5" />{/if}
 						<circle cx={x(i)} cy={y(value)} r="3.5" fill={item.color}><title>{labels[i]} · {item.name}: {label(value)}</title></circle>
 					{/if}
 				{/each}
