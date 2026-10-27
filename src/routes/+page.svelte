@@ -21,6 +21,7 @@
 		setBudget,
 		saveFatherExpense,
 		saveOwnIncome,
+		saveOwnTransfer,
 		type Context,
 		DEMO_MONTH,
 		DEMO_PERIODS,
@@ -202,17 +203,18 @@
 		formDialog.showModal();
 	}
 	function editMovement(movement: Movement) {
-		if (role !== 'admin' || (movement.kind !== 'expense' && !(movement.kind === 'income' && movement.context === 'own'))) return;
+		if (role !== 'admin' || (movement.kind !== 'expense' && !(['income', 'transfer'].includes(movement.kind) && movement.context === 'own'))) return;
 		detailDialog.close();
 		openForm();
 		entryContext = movement.context;
-		kind = movement.kind as 'expense' | 'income';
+		kind = movement.kind as 'expense' | 'income' | 'transfer';
 		editingId = movement.id;
 		concept = movement.concept;
 		amount = inputMoney(movement.amount);
 		date = movement.date;
 		category = movement.category;
 		account = movement.account;
+		destination = movement.destination ?? accounts[1];
 		fixed = movement.fixed;
 		const record = shared.find(s => s.expenseId === movement.id);
 		isShared = !!record;
@@ -302,6 +304,7 @@
 				movements = editingId ? movements.map(m => m.id === editingId ? movement : m) : [movement, ...movements];
 				shared = nextShared;
 			} else if (entryContext === 'own' && kind === 'income') movements = saveOwnIncome(movements, movement, role);
+			else if (entryContext === 'own' && kind === 'transfer') movements = saveOwnTransfer(movements, movement, role);
 			else movements =
 				entryContext === 'father'
 					? saveFatherExpense(movements, movement, role)
@@ -315,7 +318,7 @@
 		filter = 'all';
 		page = entryContext === 'father' ? 'father' : 'movements';
 		if (entryContext === 'father') fatherTab = 'Gastos / Presupuestos';
-		toast = `${editingId ? (kind === 'income' ? 'Ingreso editado' : 'Gasto editado') : 'Movimiento añadido'} únicamente en ${entryContext === 'father' ? 'el contexto del padre' : 'mis finanzas'}.`;
+		toast = `${editingId ? (kind === 'income' ? 'Ingreso editado' : kind === 'transfer' ? 'Transferencia editada' : 'Gasto editado') : 'Movimiento añadido'} únicamente en ${entryContext === 'father' ? 'el contexto del padre' : 'mis finanzas'}.`;
 		formDialog.close();
 	}
 	function showDetail(movement: Movement) {
@@ -930,7 +933,7 @@
 			</p>
 			<h2 id="entry-title">
 				{editingId
-					? (kind === 'income' ? 'Editar ingreso' : entryContext === 'father' ? 'Editar gasto del padre' : 'Editar gasto')
+					? (kind === 'income' ? 'Editar ingreso' : kind === 'transfer' ? 'Editar transferencia' : entryContext === 'father' ? 'Editar gasto del padre' : 'Editar gasto')
 					: entryContext === 'father'
 						? 'Nuevo gasto del padre'
 						: 'Nuevo movimiento'}
@@ -949,7 +952,7 @@
 			role="group"
 			aria-label="Significado de la operación"
 		>
-			{#each entryContext === 'father' ? [{ value: 'expense', label: 'Gasto del padre' }] : editingId ? [{ value: kind, label: kind === 'income' ? 'Ingreso' : 'Gasto' }] : [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }] as option}<button
+			{#each entryContext === 'father' ? [{ value: 'expense', label: 'Gasto del padre' }] : editingId ? [{ value: kind, label: kind === 'income' ? 'Ingreso' : kind === 'transfer' ? 'Transferencia' : 'Gasto' }] : [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }] as option}<button
 					type="button"
 					class:active={kind === option.value}
 					aria-pressed={kind === option.value}
@@ -1113,10 +1116,10 @@
 				</form>{/if}
 			</section>
 		{/if}
-		{#if role === 'admin' && (selected.kind === 'expense' || (selected.kind === 'income' && selected.context === 'own'))}<button
+		{#if role === 'admin' && (selected.kind === 'expense' || (['income', 'transfer'].includes(selected.kind) && selected.context === 'own'))}<button
 				class="primary full-width"
 				onclick={() => selected && editMovement(selected)}
-				>{selected.kind === 'income' ? 'Editar ingreso' : 'Editar gasto'}</button
+				>{selected.kind === 'income' ? 'Editar ingreso' : selected.kind === 'transfer' ? 'Editar transferencia' : 'Editar gasto'}</button
 			>{/if}
 		<button class="secondary full-width" onclick={() => detailDialog.close()}
 			>Volver</button

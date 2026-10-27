@@ -1302,6 +1302,15 @@ form input::placeholder {
 .full-width {
 	width: 100%;
 }
+.detail-dialog .full-width + .full-width {
+	margin-top: 12px;
+}
+.dialog-actions {
+	flex-wrap: wrap;
+}
+.dialog-actions button {
+	min-height: 44px;
+}
 @media (min-width: 1500px) {
 	main {
 		padding-top: 48px;

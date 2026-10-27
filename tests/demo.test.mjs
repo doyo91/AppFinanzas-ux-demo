@@ -17,6 +17,7 @@ import {
 	setBudget,
 	saveFatherExpense,
 	saveOwnIncome,
+	saveOwnTransfer,
 } from '../src/lib/demo/model.ts';
 
 test('father expense creation and replacement never affect own finances or duplicate expense', () => {
@@ -239,4 +240,19 @@ test('editar un ingreso sustituye el original y actualiza los meses sin duplicar
  assert.equal(summarize(after, 'own', '2026-09').income, summarize(base, 'own', '2026-09').income + changed.amount);
  assert.throws(() => saveOwnIncome(base, changed, 'father'));
  assert.throws(() => saveOwnIncome(base, {...changed, id: 'o2'}, 'admin'));
+});
+
+test('editar transferencia conserva identidad y actualiza el fondo sin alterar ahorro', () => {
+ const base = initialMovements();
+ const original = base.find(m => m.id === 'o5');
+ const before = summarize(base, 'own', '2026-10');
+ const changed = {...original, amount: 25000};
+ const after = saveOwnTransfer(base, changed, 'admin');
+ assert.equal(after.length, base.length);
+ assert.equal(after.filter(m => m.id === original.id).length, 1);
+ assert.equal(emergencyBalance(after), emergencyBalance(base) + 10000);
+ assert.deepEqual(summarize(after, 'own', '2026-10'), before);
+ assert.throws(() => saveOwnTransfer(base, {...changed, destination: changed.account}, 'admin'));
+ assert.throws(() => saveOwnTransfer(base, {...changed, id: 'o1'}, 'admin'));
+ assert.throws(() => saveOwnTransfer(base, changed, 'father'));
 });

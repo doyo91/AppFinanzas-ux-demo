@@ -85,6 +85,19 @@ export function saveOwnIncome(data: Movement[], movement: Movement, role: 'admin
 	return previous ? data.map(m => m.id === movement.id ? { ...movement } : m) : [{ ...movement }, ...data];
 }
 
+export function saveOwnTransfer(data: Movement[], movement: Movement, role: 'admin' | 'father'): Movement[] {
+	const liquid = ['Cuenta principal', 'Fondo de emergencia'];
+	if (role !== 'admin' || movement.context !== 'own' || movement.kind !== 'transfer' ||
+		!Number.isSafeInteger(movement.amount) || movement.amount <= 0 || movement.amount > 100000000 ||
+		!liquid.includes(movement.account) || !movement.destination || !liquid.includes(movement.destination) ||
+		movement.account === movement.destination)
+		throw new Error('La transferencia necesita dos cuentas distintas y un importe válido.');
+	const previous = data.find(m => m.id === movement.id);
+	if (previous && (previous.context !== 'own' || previous.kind !== 'transfer'))
+		throw new Error('No se puede cambiar el tipo o contexto del movimiento.');
+	return previous ? data.map(m => m.id === movement.id ? { ...movement } : m) : [{ ...movement }, ...data];
+}
+
 export function setBudget(
 	data: Budget[],
 	context: Context,
