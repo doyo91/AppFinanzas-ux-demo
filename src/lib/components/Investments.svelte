@@ -62,7 +62,7 @@
 				if (action === 'contribution') oncontribute(platformId, date, cents, account);
 				else onvalue({ platformId, date, month: referenceMonth, amount: cents });
 			}
-			notice = 'Guardado. Los cambios se pierden al recargar.'; dialog.close();
+			notice = 'Guardado.'; dialog.close();
 		} catch (caught) { error = caught instanceof Error ? caught.message : 'No se ha podido guardar.'; }
 	}
 </script>

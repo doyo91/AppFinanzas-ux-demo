@@ -268,7 +268,7 @@
 		filter = 'all';
 		page = entryContext === 'father' ? 'father' : 'movements';
 		if (entryContext === 'father') fatherTab = 'Gastos / Presupuestos';
-		toast = `${editingId ? 'Gasto editado' : 'Movimiento añadido'} únicamente en ${entryContext === 'father' ? 'el contexto del padre' : 'mis finanzas'}. Los cambios duran hasta recargar.`;
+		toast = `${editingId ? 'Gasto editado' : 'Movimiento añadido'} únicamente en ${entryContext === 'father' ? 'el contexto del padre' : 'mis finanzas'}.`;
 		formDialog.close();
 	}
 	function showDetail(movement: Movement) {
@@ -427,17 +427,7 @@
 										: 'Fondo de emergencia'}</span
 			>
 			<div class="topbar-right">
-				<label class="perspective-picker"
-					><span>Ver como</span><select
-						aria-label="Ver como"
-						value={role}
-						onchange={(event) =>
-							switchPerspective(event.currentTarget.value as typeof role)}
-						><option value="admin">Administrador</option><option value="father"
-							>Padre</option
-						></select
-					></label
-				>
+				{#if role === 'father'}<button class="text-button" onclick={() => switchPerspective('admin')}>Volver al administrador</button>{/if}
 				<span
 					class="profile-circle">{role === 'admin' ? 'A' : 'P'}</span
 				>
@@ -604,7 +594,7 @@
 								max="600000"
 								aria-label="Objetivo del fondo de emergencia"
 							></progress>
-							<p>Saldo al 13 oct · objetivo de ejemplo</p>
+							<p>Saldo al 13 oct</p>
 							<button class="text-button" onclick={() => navigate('emergency')}
 								>Ver mi fondo <Icon name="arrow" size={16} /></button
 							>
@@ -724,6 +714,7 @@
 				{#if role === 'admin'}<div class="father-admin-actions">
 						<button class="primary" onclick={openForm}
 							>Añadir gasto del padre</button
+						><button class="secondary" onclick={() => switchPerspective('father')}>Ver vista del padre</button
 						><BudgetEditor
 							{budgets}
 							context="father"
@@ -743,9 +734,7 @@
 						<section class="father-hero">
 							<span class="soft-tag">Ciclo · 1–31 octubre</span>
 							<h2 class="prudent-label">Disponible prudente</h2>
-							<strong>365,50 €</strong><small
-								>Importe de ejemplo para probar la interfaz</small
-							>
+							<strong>365,50 €</strong>
 							<div class="father-inline-metrics">
 								<span
 									>Ingresos registrados<strong
@@ -805,7 +794,7 @@
 				{:else}<section class="panel debt-panel">
 						<span class="icon-tile"><Icon name="person" size={24} /></span>
 						<h2>Préstamo personal</h2>
-						<p>Deuda con el administrador · importe de ejemplo</p>
+						<p>Deuda con el administrador</p>
 						<strong class="debt-number">450,00 €</strong>
 						<div class="debt-summary">
 							<span>Al inicio del mes<strong>500,00 €</strong></span><span
@@ -813,7 +802,7 @@
 							><span>Evolución<strong class="positive">−50,00 €</strong></span>
 						</div>
 						<p class="muted">
-							Importes de ejemplo no vinculados al registro de movimientos. Sin gestión de revolving.
+							Importes no vinculados al registro de movimientos. Sin gestión de revolving.
 						</p>
 					</section>{/if}
 			{:else if page === 'investments'}
@@ -839,9 +828,9 @@
 						max="600000"
 						aria-label="Progreso hacia el objetivo de emergencia"
 					></progress>
-					<p>Objetivo de ejemplo: <strong>6.000,00 €</strong></p>
+					<p>Objetivo: <strong>6.000,00 €</strong></p>
 					<small
-						>Saldo inicial de ejemplo: 4.200,00 € al 1 de octubre, más
+						>Saldo inicial: 4.200,00 € al 1 de octubre, más
 						movimientos registrados.</small
 					><button
 						class="primary"
@@ -856,12 +845,7 @@
 					</p>
 				</section>
 			{/if}
-			<footer class="page-footer">
-				<span>Datos ficticios · Los cambios se pierden al recargar</span
-				>{#if role === 'admin'}<button onclick={reset}
-						>Restablecer datos de prueba</button
-					>{/if}
-			</footer>
+			
 		</main>
 	</div>
 
