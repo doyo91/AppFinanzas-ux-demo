@@ -64,8 +64,6 @@
 	let refundDate = $state('2026-10-13');
 	let refundError = $state('');
 	let selectedShared = $derived(shared.find(s => s.expenseId === selected?.id));
-	let formTotal = $derived(parseAmount(amount));
-	let ownShareCents = $derived(parseShare(ownShare));
 	let toast = $state('');
 	let moreOpen = $state(false);
 	let formDialog: HTMLDialogElement;
@@ -74,6 +72,8 @@
 	let kind = $state<'expense' | 'income' | 'transfer'>('expense');
 	let concept = $state('');
 	let amount = $state('');
+	let formTotal = $derived(parseAmount(amount));
+	let ownShareCents = $derived(parseShare(ownShare));
 	let date = $state('2026-10-13');
 	let category = $state(categories[0]);
 	let account = $state(accounts[0]);
