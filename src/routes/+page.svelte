@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Records from '#lib/components/Records.svelte';
+	import { netMovements, type LoanEvent, type Shared } from '#lib/demo/shared.ts';
 	import Investments from '#lib/components/Investments.svelte';
 	import { initialPortfolios, initialPlatforms, initialValuations, createPortfolio, savePlatform, addContribution, saveValuation } from '#lib/demo/investments.ts';
 	import Icon from '#lib/components/Icon.svelte';
@@ -38,6 +40,12 @@
 		{ name: 'Deudas', mobile: 'Deudas', icon: 'person' },
 	];
 	let movements = $state(initialMovements());
+	let loans = $state<LoanEvent[]>([]);
+	let shared = $state<Shared[]>([]);
+	let net = $derived(netMovements(movements, shared));
+	let loanOut = $derived(loans.filter(e => e.type === 'loan' && e.date.startsWith(month)).reduce((n,e) => n + e.amount, 0));
+	let loanIn = $derived(loans.filter(e => e.type === 'repayment' && e.date.startsWith(month)).reduce((n,e) => n + e.amount, 0));
+	let refundIn = $derived(shared.flatMap(s => s.payments).filter(e => e.date.startsWith(month)).reduce((n,e) => n + e.amount, 0));
 	let portfolios = $state(initialPortfolios());
 	let valuations = $state(initialValuations());
 	let platforms = $state(initialPlatforms());
@@ -69,7 +77,7 @@
 		investment: 'Aportación',
 	};
 	let monthLabels: Record<string, string> = $derived(Object.fromEntries(
-		[...new Set([...DEMO_PERIODS.map((p) => p.month), ...movements.filter((m) => m.context === 'own').map((m) => m.date.slice(0, 7))])]
+		[...new Set([...DEMO_PERIODS.map((p) => p.month), ...movements.filter((m) => m.context === 'own').map((m) => m.date.slice(0, 7)), ...loans.map(e => e.date.slice(0, 7)), ...shared.flatMap(s => s.payments.map(e => e.date.slice(0, 7)))])]
 			.toSorted((a, b) => b.localeCompare(a)).map((period) => {
 				const label = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${period}-01T12:00:00Z`));
 				return [period, label.replace(/^./, (letter) => letter.toUpperCase())];
@@ -93,7 +101,7 @@
 		history: 'Compara los meses a partir de sus movimientos.',
 		emergency: 'Una reserva de liquidez, separada del gasto diario.',
 	};
-	let totals = $derived(summarize(movements, 'own', month));
+	let totals = $derived(summarize(net, 'own', month));
 	let fatherTotals = $derived(summarize(movements, 'father', DEMO_MONTH));
 	let emergency = $derived(emergencyBalance(movements));
 	let current = $derived(
@@ -121,7 +129,7 @@
 		categories
 			.map((name) => ({
 				name,
-				amount: categorySpend(movements, 'own', month, name),
+				amount: categorySpend(net, 'own', month, name),
 			}))
 			.filter((c) => c.amount > 0)
 			.toSorted((a, b) => b.amount - a.amount),
@@ -149,6 +157,8 @@
 	}
 	function reset() {
 		movements = initialMovements();
+		loans = [];
+		shared = [];
 		portfolios = initialPortfolios();
 		valuations = initialValuations();
 		platforms = initialPlatforms();
@@ -627,7 +637,7 @@
 					<div class="budget-grid">
 						{#each budgets.filter((b) => b.context === 'own' && b.month === month) as budget}{@const spent =
 								categorySpend(
-									movements,
+									net,
 									'own',
 									month,
 									budget.category,
@@ -669,6 +679,11 @@
 					/>
 				</section>
 			{:else if page === 'movements'}
+				{#if loanOut || loanIn || refundIn}<section class="panel" style="padding: 24px; margin-bottom: 20px">
+					<h2>Dinero prestado y recuperado · {monthLabels[month]}</h2>
+					<p>Prestado: {money(loanOut)} · Devuelto por tu padre: {money(loanIn)} · Reembolsos recibidos: {money(refundIn)}</p>
+					<small>Estos movimientos no son ingresos ni gastos ordinarios.</small>
+				</section>{/if}
 				<section class="panel">
 					<div class="filter-bar">
 						<label class="search-input"
@@ -697,6 +712,7 @@
 						>
 					</div>
 				</section>
+				<Records mode="own" {role} {movements} {loans} {shared} onloans={(v) => loans = v} onshared={(v) => shared = v} />
 			{:else if page === 'father'}
 				<div class="context-notice">
 					<Icon name="shield" size={19} />
@@ -791,20 +807,7 @@
 						)}
 					</section>
 				{:else if fatherTab === 'Histórico'}<FatherHistory {movements} />
-				{:else}<section class="panel debt-panel">
-						<span class="icon-tile"><Icon name="person" size={24} /></span>
-						<h2>Préstamo personal</h2>
-						<p>Deuda con el administrador</p>
-						<strong class="debt-number">450,00 €</strong>
-						<div class="debt-summary">
-							<span>Al inicio del mes<strong>500,00 €</strong></span><span
-								>Devolución<strong>50,00 €</strong></span
-							><span>Evolución<strong class="positive">−50,00 €</strong></span>
-						</div>
-						<p class="muted">
-							Importes no vinculados al registro de movimientos. Sin gestión de revolving.
-						</p>
-					</section>{/if}
+				{:else}<Records mode="father" {role} {movements} {loans} {shared} onloans={(v) => loans = v} onshared={(v) => shared = v} />{/if}
 			{:else if page === 'investments'}
 				<Investments {movements} {portfolios} {platforms} {valuations}
 					onportfolio={(value) => { portfolios = createPortfolio(portfolios, value, role); }}
@@ -814,7 +817,7 @@
 					}}
 					onvalue={(value) => { valuations = saveValuation(valuations, platforms, value, role); }} />
 			{:else if page === 'history'}
-				<FatherHistory {movements} context="own" onview={(period) => {
+				<FatherHistory movements={net} context="own" onview={(period) => {
 					month = period;
 					navigate('movements');
 				}} />
@@ -911,9 +914,7 @@
 			onclick={() => formDialog.close()}><Icon name="close" /></button
 		>
 	</div>
-	<p class="dialog-intro">
-		Prueba el registro. Se guardará solo durante esta sesión.
-	</p>
+	
 	<form onsubmit={save}>
 		<div
 			class="kind-picker"
