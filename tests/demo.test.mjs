@@ -16,6 +16,7 @@ import {
 	initialBudgets,
 	setBudget,
 	saveFatherExpense,
+	saveOwnIncome,
 } from '../src/lib/demo/model.ts';
 
 test('father expense creation and replacement never affect own finances or duplicate expense', () => {
@@ -225,4 +226,17 @@ test('history defaults follow the Madrid year boundary and months do not leak be
 	assert.ok(historyYears(scoped, 'own', 2027).includes(2020));
 	assert.ok(!historyYears(scoped, 'father', 2027).includes(2020));
 	assert.ok(historyYears(scoped, 'father', 2027).includes(2027));
+});
+
+test('editar un ingreso sustituye el original y actualiza los meses sin duplicarlo', () => {
+ const base = initialMovements();
+ const original = base.find(m => m.id === 'o1');
+ const changed = { ...original, amount: 180000, date: '2026-09-20', concept: 'Ingreso corregido' };
+ const after = saveOwnIncome(base, changed, 'admin');
+ assert.equal(after.length, base.length);
+ assert.equal(after.filter(m => m.id === original.id).length, 1);
+ assert.equal(summarize(after, 'own', '2026-10').income, summarize(base, 'own', '2026-10').income - original.amount);
+ assert.equal(summarize(after, 'own', '2026-09').income, summarize(base, 'own', '2026-09').income + changed.amount);
+ assert.throws(() => saveOwnIncome(base, changed, 'father'));
+ assert.throws(() => saveOwnIncome(base, {...changed, id: 'o2'}, 'admin'));
 });

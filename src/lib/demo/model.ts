@@ -73,6 +73,18 @@ export function saveFatherExpense(
 		: [{ ...movement }, ...data];
 }
 
+export function saveOwnIncome(data: Movement[], movement: Movement, role: 'admin' | 'father'): Movement[] {
+	if (role !== 'admin' || movement.context !== 'own' || movement.kind !== 'income' ||
+		!Number.isSafeInteger(movement.amount) || movement.amount <= 0 || movement.amount > 100000000 ||
+		!['Trabajo', 'Otros ingresos'].includes(movement.category) ||
+		!['Cuenta principal', 'Fondo de emergencia'].includes(movement.account))
+		throw new Error('No se puede guardar este ingreso.');
+	const previous = data.find(m => m.id === movement.id);
+	if (previous && (previous.context !== 'own' || previous.kind !== 'income'))
+		throw new Error('No se puede cambiar el tipo o contexto del movimiento.');
+	return previous ? data.map(m => m.id === movement.id ? { ...movement } : m) : [{ ...movement }, ...data];
+}
+
 export function setBudget(
 	data: Budget[],
 	context: Context,
