@@ -2,11 +2,13 @@
 	import { money, parseAmount, DEMO_MONTH, currentHistoryPeriod, historyPeriods, type Movement } from '#lib/demo/model.ts';
 	import { monthlyValuation, periodPerformance, investmentSeries, type Portfolio, type Platform, type Valuation } from '#lib/demo/investments.ts';
 	import InvestmentChart from './InvestmentChart.svelte';
-	let { movements, portfolios, platforms, valuations, onportfolio, onplatform, oncontribute, onvalue }: {
+	let { movements, portfolios, platforms, valuations, onportfolio, onplatform, oncontribute, oneditcontribution, editContributionId, oneditopened, onvalue }: {
 		movements: Movement[]; portfolios: Portfolio[]; platforms: Platform[]; valuations: Valuation[];
 		onportfolio: (value: Portfolio) => void; onplatform: (value: Platform) => void;
 		oncontribute: (platformId: string, date: string, amount: number, account: string) => void;
 		onvalue: (value: Valuation) => void;
+		oneditcontribution: (id: string, platformId: string, date: string, amount: number, account: string) => void;
+		editContributionId: string | null; oneditopened: () => void;
 	} = $props();
 	const current = currentHistoryPeriod();
 	let tab = $state('Resumen');
@@ -57,6 +59,21 @@
 		open('valuation', value.platformId); date = value.date; referenceMonth = value.month;
 		amount = `${Math.trunc(value.amount / 100)},${String(value.amount % 100).padStart(2, '0')}`;
 	}
+	function editContribution(id: string) {
+		const movement = movements.find(m => m.id === id && m.context === 'own' && m.kind === 'investment');
+		if (!movement || !movement.platformId || !platforms.some(p => p.id === movement.platformId)) return;
+		const platform = platforms.find(p => p.id === movement.platformId)!;
+		portfolioId = platform.portfolioId;
+		open('contribution', platform.id);
+		editingId = movement.id; date = movement.date; account = movement.account;
+		amount = `${Math.trunc(movement.amount / 100)},${String(movement.amount % 100).padStart(2, '0')}`;
+	}
+	$effect(() => {
+		if (editContributionId && dialog) {
+			editContribution(editContributionId);
+			oneditopened();
+		}
+	});
 	function save(event: SubmitEvent) {
 		event.preventDefault(); error = '';
 		try {
@@ -66,7 +83,8 @@
 			else {
 				const cents = action === 'valuation' && /^0(?:[,.]0{1,2})?$/.test(amount.trim()) ? 0 : parseAmount(amount);
 				if (cents === null) throw new Error('Introduce un importe válido con hasta dos decimales.');
-				if (action === 'contribution') oncontribute(platformId, date, cents, account);
+				if (action === 'contribution' && editingId) oneditcontribution(editingId, platformId, date, cents, account);
+				else if (action === 'contribution') oncontribute(platformId, date, cents, account);
 				else onvalue({ platformId, date, month: referenceMonth, amount: cents });
 			}
 			notice = 'Guardado.'; dialog.close();
@@ -126,16 +144,16 @@
 		<div class="table-scroll"><table><thead><tr><th>Mes</th><th>Valor declarado</th><th>Rentabilidad del intervalo</th></tr></thead><tbody>{#each recordedMonths as item}{@const result = periodPerformance(ids, valuations, movements, item.month)}<tr><td>{item.label}</td><td>{result.complete ? money(result.total) : 'Incompleto / sin valorar'}</td><td class:expense-amount={(result.result?.rate ?? 0) < 0}>{percent(result.result?.rate)}</td></tr>{:else}<tr><td colspan="3">Sin datos registrados en este año.</td></tr>{/each}</tbody></table></div>
 	</section>
 	<section class="panel investment-history"><div class="panel-title"><div><h2>Aportaciones y valoraciones · {year}</h2><p>Fecha real y mes de referencia separados</p></div></div>
-		{#each operations as entry (entry.id)}<div class="investment-entry"><div><strong>{entry.type} · {platforms.find((p) => p.id === entry.platformId)?.name}</strong><small>{dateLabel(entry.date)}{entry.type === 'Valoración' ? ` · referencia ${entry.month}` : ''}</small></div><strong>{entry.type === 'Aportación' ? '+' : ''}{money(entry.amount)}</strong>{#if entry.type === 'Valoración'}<button class="text-button" aria-label={`Editar valoración de ${platforms.find((p) => p.id === entry.platformId)?.name} del ${entry.date}`} onclick={() => editValue(entry)}>Editar</button>{/if}</div>{:else}<p class="investment-hint">Sin operaciones para esta selección.</p>{/each}
+		{#each operations as entry (entry.id)}<div class="investment-entry"><div><strong>{entry.type} · {platforms.find((p) => p.id === entry.platformId)?.name}</strong><small>{dateLabel(entry.date)}{entry.type === 'Valoración' ? ` · referencia ${entry.month}` : ''}</small></div><strong>{entry.type === 'Aportación' ? '+' : ''}{money(entry.amount)}</strong>{#if entry.type === 'Valoración'}<button class="text-button" aria-label={`Editar valoración de ${platforms.find((p) => p.id === entry.platformId)?.name} del ${entry.date}`} onclick={() => editValue(entry)}>Editar</button>{:else}<button class="text-button" aria-label={`Editar aportación de ${platforms.find((p) => p.id === entry.platformId)?.name} del ${entry.date}`} onclick={() => editContribution(entry.id)}>Editar</button>{/if}</div>{:else}<p class="investment-hint">Sin operaciones para esta selección.</p>{/each}
 	</section>
 {/if}
 <p class="investment-hint">Retiradas y traspasos todavía pendientes en esta interfaz. Las comparaciones del 5 % y 9 % son referencias, no cotizaciones ni previsiones.</p>
 
-<dialog bind:this={dialog} class="entry-dialog" aria-label={action === 'portfolio' ? 'Cartera' : action === 'platform' ? 'Plataforma' : action === 'contribution' ? 'Añadir aportación' : 'Registrar saldo mensual'}>
-	<div class="dialog-heading"><h2>{action === 'portfolio' ? (editingId ? 'Editar cartera' : 'Nueva cartera') : action === 'platform' ? (editingId ? 'Editar plataforma' : 'Nueva plataforma') : action === 'contribution' ? 'Añadir aportación' : 'Registrar saldo mensual'}</h2><button class="secondary" onclick={() => dialog.close()}>Cerrar</button></div>
+<dialog bind:this={dialog} class="entry-dialog" aria-label={action === 'portfolio' ? 'Cartera' : action === 'platform' ? 'Plataforma' : action === 'contribution' ? (editingId ? 'Editar aportación' : 'Añadir aportación') : 'Registrar saldo mensual'}>
+	<div class="dialog-heading"><h2>{action === 'portfolio' ? (editingId ? 'Editar cartera' : 'Nueva cartera') : action === 'platform' ? (editingId ? 'Editar plataforma' : 'Nueva plataforma') : action === 'contribution' ? (editingId ? 'Editar aportación' : 'Añadir aportación') : 'Registrar saldo mensual'}</h2><button class="secondary" onclick={() => dialog.close()}>Cerrar</button></div>
 	<form onsubmit={save}>
 		{#if action === 'portfolio' || action === 'platform'}<label>Nombre<input bind:value={name} required maxlength="60" /></label>{#if action === 'platform'}<p class="form-hint">Pertenece a {portfolios.find((p) => p.id === portfolioId)?.name}. Sus saldos se agregarán a esta cartera.</p>{/if}
-		{:else}<p class="form-hint">{action === 'contribution' ? 'Registra cuándo entra el capital en la plataforma. No cuenta como gasto.' : 'Introduce el saldo total que muestra esta plataforma en la fecha real. Una valoración no mueve dinero.'}</p><label>Plataforma<select aria-label="Plataforma del registro" bind:value={platformId} required>{#each members as platform}<option value={platform.id}>{platform.name}</option>{/each}</select></label>
+		{:else}<p class="form-hint">{action === 'contribution' ? 'Registra cuándo entra el capital en la plataforma. No cuenta como gasto.' : 'Introduce el saldo total que muestra esta plataforma en la fecha real. Una valoración no mueve dinero.'}</p><label>Plataforma<select aria-label="Plataforma del registro" bind:value={platformId} required>{#each action === 'contribution' && editingId ? platforms : members as platform}<option value={platform.id}>{platform.name}{action === 'contribution' && editingId ? ` · ${portfolios.find(p => p.id === platform.portfolioId)?.name ?? ''}` : ''}</option>{/each}</select></label>
 			<div class="form-columns"><label>Fecha real<input type="date" bind:value={date} required /></label><label>{action === 'contribution' ? 'Aportación (€)' : 'Saldo total (€)'}<input bind:value={amount} inputmode="decimal" placeholder="0,00" required /></label></div>
 			{#if action === 'valuation'}<label>Mes de referencia<input type="month" bind:value={referenceMonth} required /></label>{:else}<label>Cuenta de origen<select bind:value={account}><option>Cuenta principal</option><option>Fondo de emergencia</option></select></label>{/if}
 			{#if replacing}<p class="form-hint" role="status">Ya existe una valoración para esta plataforma y fecha. Se sustituirá; no se duplicará.</p>{/if}

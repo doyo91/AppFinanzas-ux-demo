@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { initialMovements, summarize, emergencyBalance } from '../src/lib/demo/model.ts';
-import { initialPortfolios, initialPlatforms, initialValuations, addContribution, saveValuation, createPortfolio, savePlatform, monthlyValuation, modifiedDietz, periodPerformance, investmentSeries } from '../src/lib/demo/investments.ts';
+import { initialPortfolios, initialPlatforms, initialValuations, addContribution, editContribution, saveValuation, createPortfolio, savePlatform, monthlyValuation, modifiedDietz, periodPerformance, investmentSeries } from '../src/lib/demo/investments.ts';
 
 test('platform contributions have one source without changing ordinary income, expenses or savings', () => {
 	const original = initialMovements(); const platforms = initialPlatforms();
@@ -79,4 +79,22 @@ test('comparison series chain returns geometrically and compare compounded refer
 	assert.ok(series[2].nine > series[2].five);
 	assert.equal(investmentSeries(['a'], [{ ...values[0], amount: 0 }], [], 2026)[0].index, null);
 	assert.equal(series[3].total, null); assert.equal(series[3].index, null);
+});
+
+test('editar aportación actualiza movimiento, plataforma y cuenta sin duplicar ni afectar ahorro', () => {
+ const platforms = initialPlatforms();
+ const base = initialMovements();
+ const before = summarize(base, 'own', '2026-10');
+ const input = {id:'o4', platformId:'broker', date:'2026-10-08', amount:40000, account:'Fondo de emergencia'};
+ const after = editContribution(base, platforms, input, 'admin');
+ assert.equal(after.length, base.length);
+ assert.equal(after.filter(m => m.id === 'o4').length, 1);
+ assert.equal(after.find(m => m.id === 'o4').platformId, 'broker');
+ assert.equal(after.find(m => m.id === 'o4').portfolioId, 'long-term');
+ assert.equal(summarize(after, 'own', '2026-10').investment, before.investment + 10000);
+ assert.equal(summarize(after, 'own', '2026-10').savings, before.savings);
+ assert.equal(emergencyBalance(after), emergencyBalance(base) - 40000);
+ assert.throws(() => editContribution(base, platforms, {...input,id:'o1'}, 'admin'));
+ assert.throws(() => editContribution(base, platforms, input, 'father'));
+ assert.throws(() => editContribution(base, platforms, {...input,amount:0}, 'admin'));
 });

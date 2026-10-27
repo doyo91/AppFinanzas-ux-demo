@@ -54,6 +54,19 @@ export function addContribution(movements: Movement[], platforms: Platform[], in
 		concept: `Aportación · ${platform.name}`, amount: input.amount, kind: 'investment',
 		category: 'Inversión', account: input.account, fixed: false }, ...movements];
 }
+export function editContribution(movements: Movement[], platforms: Platform[], input: {
+	id: string; platformId: string; date: string; amount: number; account: string;
+}, role: string): Movement[] {
+	validate(platforms, input.platformId, input.date, input.amount, role);
+	const original = movements.find(m => m.id === input.id);
+	if (!original || original.kind !== 'investment' || original.context !== 'own' ||
+		input.amount <= 0 || !['Cuenta principal', 'Fondo de emergencia'].includes(input.account))
+		throw new Error('Revisa la aportación y la cuenta de origen.');
+	const platform = platforms.find(p => p.id === input.platformId)!;
+	return movements.map(m => m.id === input.id ? { ...original, platformId: platform.id,
+		portfolioId: platform.portfolioId, date: input.date, amount: input.amount, account: input.account,
+		concept: `Aportación · ${platform.name}` } : m);
+}
 export function saveValuation(data: Valuation[], platforms: Platform[], value: Valuation, role: string): Valuation[] {
 	validate(platforms, value.platformId, value.date, value.amount, role);
 	if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(value.month)) throw new Error('Elige un mes de referencia válido.');

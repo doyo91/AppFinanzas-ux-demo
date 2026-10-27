@@ -2,7 +2,7 @@
 	import Records from '#lib/components/Records.svelte';
 	import { netMovements, addRefund, updateShared, type LoanEvent, type Shared } from '#lib/demo/shared.ts';
 	import Investments from '#lib/components/Investments.svelte';
-	import { initialPortfolios, initialPlatforms, initialValuations, createPortfolio, savePlatform, addContribution, saveValuation } from '#lib/demo/investments.ts';
+	import { initialPortfolios, initialPlatforms, initialValuations, createPortfolio, savePlatform, addContribution, editContribution, saveValuation } from '#lib/demo/investments.ts';
 	import Icon from '#lib/components/Icon.svelte';
 	import FatherBudgets from '#lib/components/FatherBudgets.svelte';
 	import FatherHistory from '#lib/components/FatherHistory.svelte';
@@ -71,6 +71,7 @@
 	let formDialog: HTMLDialogElement;
 	let detailDialog: HTMLDialogElement;
 	let selected = $state<Movement | null>(null);
+	let contributionToEdit = $state<string | null>(null);
 	let kind = $state<'expense' | 'income' | 'transfer'>('expense');
 	let concept = $state('');
 	let amount = $state('');
@@ -840,7 +841,8 @@
 				{:else if fatherTab === 'Histórico'}<FatherHistory {movements} />
 				{:else}<Records mode="father" {role} {movements} {loans} {shared} onloans={(v) => loans = v} onshared={(v) => shared = v} />{/if}
 			{:else if page === 'investments'}
-				<Investments {movements} {portfolios} {platforms} {valuations}
+				<Investments {movements} {portfolios} {platforms} {valuations} editContributionId={contributionToEdit} oneditopened={() => contributionToEdit = null}
+					oneditcontribution={(id, platformId, date, amount, account) => { movements = editContribution(movements, platforms, { id, platformId, date, amount, account }, role); }}
 					onportfolio={(value) => { portfolios = createPortfolio(portfolios, value, role); }}
 					onplatform={(value) => { platforms = savePlatform(platforms, portfolios, value, role); }}
 					oncontribute={(platformId, date, amount, account) => {
@@ -1121,6 +1123,7 @@
 				onclick={() => selected && editMovement(selected)}
 				>{selected.kind === 'income' ? 'Editar ingreso' : selected.kind === 'transfer' ? 'Editar transferencia' : 'Editar gasto'}</button
 			>{/if}
+		{#if role === 'admin' && selected.kind === 'investment' && selected.context === 'own' && selected.platformId}<button class="primary full-width" onclick={() => { contributionToEdit = selected!.id; detailDialog.close(); navigate('investments'); }}>Editar aportación</button>{/if}
 		<button class="secondary full-width" onclick={() => detailDialog.close()}
 			>Volver</button
 		>{/if}
