@@ -87,7 +87,7 @@
 		home: 'Lo importante de este mes, en un solo lugar.',
 		movements:
 			'Consulta y prueba el registro de ingresos, gastos y transferencias.',
-		investments: 'Una vista de ejemplo de tus carteras y aportaciones.',
+		investments: 'Una vista de tus carteras y aportaciones.',
 		father:
 			'Un contexto separado: el administrador gestiona y el padre consulta.',
 		history: 'Compara los meses a partir de sus movimientos.',
@@ -156,7 +156,7 @@
 		query = '';
 		filter = 'all';
 		month = DEMO_MONTH;
-		toast = 'Datos de ejemplo restablecidos.';
+		toast = 'Datos de prueba restablecidos.';
 	}
 	function openForm() {
 		if (role !== 'admin') return;
@@ -226,7 +226,7 @@
 			Number.isNaN(Date.parse(date)) ||
 			new Date(date).toISOString().slice(0, 10) !== date
 		) {
-			error = 'Elige una fecha válida de mayo a octubre de 2026 para esta demo.';
+			error = 'Elige una fecha válida de mayo a octubre de 2026.';
 			return;
 		}
 		if (
@@ -239,7 +239,7 @@
 		}
 		if (!editingId && movements.length >= 1000) {
 			error =
-				'Has llegado al límite de esta demo. Reinicia los datos para seguir probando.';
+				'Has llegado al límite de registros. Restablece los datos de prueba para continuar.';
 			return;
 		}
 		const movement: Movement = {
@@ -278,9 +278,9 @@
 </script>
 
 <svelte:head
-	><title>AppFinanzas · Prototipo</title><meta
+	><title>AppFinanzas</title><meta
 		name="description"
-		content="Prototipo local de AppFinanzas con datos ficticios"
+		content="Gestión y seguimiento de tus finanzas"
 	/></svelte:head
 >
 
@@ -325,7 +325,7 @@
 		{:else}<div class="empty-state">
 				<Icon name="search" size={28} />
 				<h3>No hay movimientos aquí</h3>
-				<p>Prueba otra búsqueda o registra un movimiento de ejemplo.</p>
+				<p>Prueba otra búsqueda o registra un movimiento.</p>
 				{#if query || filter !== 'all'}<button
 						class="text-button"
 						onclick={() => {
@@ -401,12 +401,9 @@
 			</nav>
 		{/if}
 		<div class="sidebar-bottom">
-			<div class="demo-note">
-				<span class="tiny-dot"></span><strong>Espacio de demostración</strong>
-				<p>Explora con tranquilidad.<br />Todos los datos son ficticios.</p>
-			</div>
+			
 			{#if role === 'admin'}<button class="reset-button" onclick={reset}
-					><Icon name="reset" size={16} />Reiniciar demo</button
+					><Icon name="reset" size={16} />Restablecer datos de prueba</button
 				>{/if}
 		</div>
 	</aside>
@@ -431,8 +428,8 @@
 			>
 			<div class="topbar-right">
 				<label class="perspective-picker"
-					><span>Ver demo como</span><select
-						aria-label="Ver demo como"
+					><span>Ver como</span><select
+						aria-label="Ver como"
 						value={role}
 						onchange={(event) =>
 							switchPerspective(event.currentTarget.value as typeof role)}
@@ -441,7 +438,7 @@
 						></select
 					></label
 				>
-				<span class="demo-badge"><span></span>Demo local</span><span
+				<span
 					class="profile-circle">{role === 'admin' ? 'A' : 'P'}</span
 				>
 			</div>
@@ -565,7 +562,7 @@
 							></span><i style="left:20%"></i>
 						</div>
 						<div class="goal-labels">
-							<span>Margen actual</span><span>Objetivo demo: 20 %</span>
+							<span>Margen actual</span><span>Objetivo: 20 %</span>
 						</div>
 						<p class="goal-message">
 							{totals.rate !== null && totals.rate >= 20
@@ -607,7 +604,7 @@
 								max="600000"
 								aria-label="Objetivo del fondo de emergencia"
 							></progress>
-							<p>Saldo demo al 13 oct · objetivo de ejemplo</p>
+							<p>Saldo al 13 oct · objetivo de ejemplo</p>
 							<button class="text-button" onclick={() => navigate('emergency')}
 								>Ver mi fondo <Icon name="arrow" size={16} /></button
 							>
@@ -618,7 +615,7 @@
 								<h2>Finanzas del padre</h2>
 							</div>
 							<p>
-								Datos de ejemplo revisados hasta el <strong
+								Datos revisados hasta el <strong
 									>12 de octubre</strong
 								>.
 							</p>
@@ -633,7 +630,7 @@
 					<div class="panel-title">
 						<div>
 							<h2>Presupuestos a tu ritmo</h2>
-							<p>Límites de ejemplo para las categorías que quieres cuidar</p>
+							<p>Límites para las categorías que quieres cuidar</p>
 						</div>
 						<span class="soft-tag">{monthLabels[month]}</span>
 					</div>
@@ -706,8 +703,7 @@
 					{@render movementList(filtered)}
 					<div class="panel-footer">
 						<span
-							>Haz clic en un movimiento para ver su detalle. Datos temporales
-							de demostración.</span
+							>Selecciona un movimiento para ver su detalle.</span
 						>
 					</div>
 				</section>
@@ -745,7 +741,7 @@
 				</div>
 				{#if fatherTab === 'Inicio'}<div class="father-grid">
 						<section class="father-hero">
-							<span class="soft-tag">Ciclo de ejemplo · 1–31 octubre</span>
+							<span class="soft-tag">Ciclo · 1–31 octubre</span>
 							<h2 class="prudent-label">Disponible prudente</h2>
 							<strong>365,50 €</strong><small
 								>Importe de ejemplo para probar la interfaz</small
@@ -809,16 +805,15 @@
 				{:else}<section class="panel debt-panel">
 						<span class="icon-tile"><Icon name="person" size={24} /></span>
 						<h2>Préstamo personal</h2>
-						<p>Ejemplo de deuda con el administrador</p>
+						<p>Deuda con el administrador · importe de ejemplo</p>
 						<strong class="debt-number">450,00 €</strong>
 						<div class="debt-summary">
 							<span>Al inicio del mes<strong>500,00 €</strong></span><span
-								>Devolución de ejemplo<strong>50,00 €</strong></span
+								>Devolución<strong>50,00 €</strong></span
 							><span>Evolución<strong class="positive">−50,00 €</strong></span>
 						</div>
 						<p class="muted">
-							Valores de demostración independientes del registro de
-							movimientos. Sin gestión de revolving.
+							Importes de ejemplo no vinculados al registro de movimientos. Sin gestión de revolving.
 						</p>
 					</section>{/if}
 			{:else if page === 'investments'}
@@ -838,7 +833,7 @@
 				<section class="panel emergency-detail">
 					<span class="icon-tile"><Icon name="shield" size={28} /></span>
 					<h2>Un poco más de tranquilidad</h2>
-					<p>Saldo ficticio al 13 de octubre de 2026</p>
+					<p>Saldo al 13 de octubre de 2026</p>
 					<strong class="debt-number">{money(emergency)}</strong><progress
 						value={Math.max(0, emergency)}
 						max="600000"
@@ -847,14 +842,14 @@
 					<p>Objetivo de ejemplo: <strong>6.000,00 €</strong></p>
 					<small
 						>Saldo inicial de ejemplo: 4.200,00 € al 1 de octubre, más
-						movimientos de la demo.</small
+						movimientos registrados.</small
 					><button
 						class="primary"
 						onclick={() => {
 							openForm();
 							selectKind('transfer');
 						}}
-						><Icon name="movement" size={17} />Probar una transferencia</button
+						><Icon name="movement" size={17} />Añadir transferencia</button
 					>
 					<p class="muted">
 						Transferir dinero al fondo no crea un gasto ni un ahorro nuevo.
@@ -862,11 +857,9 @@
 				</section>
 			{/if}
 			<footer class="page-footer">
-				<span
-					><span class="tiny-dot"></span>Prototipo · Datos ficticios · Sin
-					conexión a cuentas reales</span
+				<span>Datos ficticios · Los cambios se pierden al recargar</span
 				>{#if role === 'admin'}<button onclick={reset}
-						>Reiniciar datos de ejemplo</button
+						>Restablecer datos de prueba</button
 					>{/if}
 			</footer>
 		</main>
@@ -906,7 +899,7 @@
 			><button onclick={() => navigate('father')}
 				><Icon name="person" />Finanzas del padre
 				<small>Contexto separado</small></button
-			><button onclick={reset}><Icon name="reset" />Reiniciar demo</button>
+			><button onclick={reset}><Icon name="reset" />Restablecer datos de prueba</button>
 		</div>{/if}
 </div>
 
@@ -918,8 +911,7 @@
 	<div class="dialog-heading">
 		<div>
 			<p class="eyebrow">
-				{entryContext === 'father' ? 'CONTEXTO DEL PADRE' : 'MIS FINANZAS'} · DATOS
-				DE EJEMPLO
+				{entryContext === 'father' ? 'CONTEXTO DEL PADRE' : 'MIS FINANZAS'}
 			</p>
 			<h2 id="entry-title">
 				{editingId
@@ -1020,7 +1012,7 @@
 			<button class="secondary" type="button" onclick={() => formDialog.close()}
 				>Cancelar</button
 			><button class="primary" type="submit"
-				>{editingId ? 'Guardar cambios' : 'Añadir a la demo'}
+				>{editingId ? 'Guardar cambios' : 'Añadir movimiento'}
 				<Icon name="arrow" size={16} /></button
 			>
 		</div>
@@ -1035,7 +1027,7 @@
 	{#if selected}<div class="dialog-heading">
 			<div>
 				<p class="eyebrow">
-					{selected.context === 'own' ? 'MIS FINANZAS' : 'CONTEXTO DEL PADRE'} · EJEMPLO
+					{selected.context === 'own' ? 'MIS FINANZAS' : 'CONTEXTO DEL PADRE'}
 				</p>
 				<h2 id="detail-title">{selected.concept}</h2>
 			</div>
@@ -1077,8 +1069,8 @@
 				: selected.kind === 'investment'
 					? 'Aportación a inversión: no se contabiliza como gasto.'
 					: selected.account === 'Tarjeta'
-						? 'Compra contabilizada una sola vez. La liquidación no está implementada en esta demo.'
-						: 'Datos ficticios para explorar la interfaz.'}
+						? 'Compra contabilizada una sola vez. La liquidación todavía no está disponible.'
+						: ''}
 		</p>
 		{#if role === 'admin' && selected.context === 'father' && selected.kind === 'expense'}<button
 				class="primary full-width"

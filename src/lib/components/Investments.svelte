@@ -62,7 +62,7 @@
 				if (action === 'contribution') oncontribute(platformId, date, cents, account);
 				else onvalue({ platformId, date, month: referenceMonth, amount: cents });
 			}
-			notice = 'Guardado en la demo. Los cambios duran hasta recargar.'; dialog.close();
+			notice = 'Guardado. Los cambios se pierden al recargar.'; dialog.close();
 		} catch (caught) { error = caught instanceof Error ? caught.message : 'No se ha podido guardar.'; }
 	}
 </script>
@@ -89,7 +89,7 @@
 	</div>
 	<section class="panel period-explanation">
 		{#if performance.result}<strong>Resultado entre valoraciones: <span class:expense-amount={performance.result.gain < 0}>{money(performance.result.gain)}</span></strong><p>{dateLabel(performance.result.start)} → {dateLabel(performance.result.end)} · Valor final menos valor inicial y aportaciones del intervalo.</p>{:else}<strong>Rentabilidad no disponible</strong><p>{performance.reason}</p>{/if}
-		{#if period === DEMO_MONTH}<p>Octubre está en curso. La última valoración de ejemplo es del 12 de octubre.</p>{/if}
+		{#if period === DEMO_MONTH}<p>Octubre está en curso. La última valoración es del 12 de octubre.</p>{/if}
 	</section>
 	<div class="investment-graphs">
 		<InvestmentChart title="Cómo evoluciona el valor" labels={historyPeriods(year).map((p) => p.label.slice(0, 3))} series={[{ name: 'Valor declarado', color: '#426c56', values: series.map((p) => p.total) }]} />
@@ -122,7 +122,7 @@
 		{#each operations as entry (entry.id)}<div class="investment-entry"><div><strong>{entry.type} · {platforms.find((p) => p.id === entry.platformId)?.name}</strong><small>{dateLabel(entry.date)}{entry.type === 'Valoración' ? ` · referencia ${entry.month}` : ''}</small></div><strong>{entry.type === 'Aportación' ? '+' : ''}{money(entry.amount)}</strong>{#if entry.type === 'Valoración'}<button class="text-button" aria-label={`Editar valoración de ${platforms.find((p) => p.id === entry.platformId)?.name} del ${entry.date}`} onclick={() => editValue(entry)}>Editar</button>{/if}</div>{:else}<p class="investment-hint">Sin operaciones para esta selección.</p>{/each}
 	</section>
 {/if}
-<p class="investment-hint">Demo con datos ficticios. Retiradas y traspasos todavía pendientes en esta interfaz. Las comparaciones del 5 % y 9 % son referencias, no cotizaciones ni previsiones.</p>
+<p class="investment-hint">Retiradas y traspasos todavía pendientes en esta interfaz. Las comparaciones del 5 % y 9 % son referencias, no cotizaciones ni previsiones.</p>
 
 <dialog bind:this={dialog} class="entry-dialog" aria-label={action === 'portfolio' ? 'Cartera' : action === 'platform' ? 'Plataforma' : action === 'contribution' ? 'Añadir aportación' : 'Registrar saldo mensual'}>
 	<div class="dialog-heading"><h2>{action === 'portfolio' ? (editingId ? 'Editar cartera' : 'Nueva cartera') : action === 'platform' ? (editingId ? 'Editar plataforma' : 'Nueva plataforma') : action === 'contribution' ? 'Añadir aportación' : 'Registrar saldo mensual'}</h2><button class="secondary" onclick={() => dialog.close()}>Cerrar</button></div>

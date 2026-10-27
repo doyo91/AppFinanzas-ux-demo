@@ -14,7 +14,7 @@
 	<div class="panel-title">
 		<div>
 			<h2>Tus presupuestos de octubre</h2>
-			<p>Los límites que ha marcado el administrador · ejemplos</p>
+			<p>Los límites que ha marcado el administrador</p>
 		</div>
 	</div>
 	<div class="father-budget-grid">

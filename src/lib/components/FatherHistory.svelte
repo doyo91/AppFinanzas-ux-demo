@@ -60,7 +60,7 @@
 			<h2>Así van tus meses</h2>
 			<p>Ingresos y gastos registrados · {selectedYear}</p>
 		</div>
-		<span class="soft-tag">Datos ficticios</span>
+		
 	</div>
 	<div class="history-selectors">
 		<label>Año<select aria-label="Año del histórico" bind:value={selectedYear}>
@@ -147,7 +147,7 @@
 			</div>
 		{/each}
 		{#if breakdown.length === 0}<p>
-				No hay gastos registrados en este mes de la demo.
+				No hay gastos registrados en este mes.
 			</p>{/if}
 
 	</section>
