@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addLoanEvent, loanBalance, addShared, addRefund, netMovements } from '../src/lib/demo/shared.ts';
+import { addLoanEvent, loanBalance, addShared, addRefund, netMovements, updateShared } from '../src/lib/demo/shared.ts';
 import { summarize } from '../src/lib/demo/model.ts';
 const expense = { id:'x', context:'own', date:'2026-01-10', amount:12000, kind:'expense', category:'Ocio', concept:'Comida', account:'Tarjeta', fixed:false };
 test('préstamo y devolución no alteran gastos y no permiten deuda negativa', () => {
@@ -19,4 +19,15 @@ test('reembolsos de otro mes reducen el gasto original sin generar ingresos', ()
  assert.equal(summarize(net,'own','2026-02').income,0);
  assert.throws(()=>addRefund(s,[expense],'x',{id:'r3',date:'2026-02-16',amount:1}));
  assert.throws(()=>addRefund(addShared([], [expense], 'x', 9000),[expense],'x',{id:'r',date:'2026-01-01',amount:1}));
+});
+
+test('editar un gasto compartido conserva reembolsos y protege sus límites', () => {
+ let s = updateShared([], expense, 9000);
+ s = addRefund(s, [expense], 'x', {id:'r',date:'2026-02-01',amount:3000});
+ assert.throws(() => updateShared(s, expense, 2999));
+ assert.throws(() => updateShared(s, expense, null));
+ assert.throws(() => updateShared(s, {...expense,date:'2026-03-01'}, 9000));
+ let changed = updateShared(s, {...expense,amount:15000}, 10000);
+ assert.equal(changed[0].payments[0].amount, 3000);
+ assert.equal(netMovements([{...expense,amount:15000}],changed)[0].amount,12000);
 });

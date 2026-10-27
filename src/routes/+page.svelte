@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Records from '#lib/components/Records.svelte';
-	import { netMovements, type LoanEvent, type Shared } from '#lib/demo/shared.ts';
+	import { netMovements, addRefund, updateShared, type LoanEvent, type Shared } from '#lib/demo/shared.ts';
 	import Investments from '#lib/components/Investments.svelte';
 	import { initialPortfolios, initialPlatforms, initialValuations, createPortfolio, savePlatform, addContribution, saveValuation } from '#lib/demo/investments.ts';
 	import Icon from '#lib/components/Icon.svelte';
@@ -56,6 +56,16 @@
 	let query = $state('');
 	let filter = $state('all');
 	let fatherTab = $state('Inicio');
+	let fatherAllExpenses = $state(false);
+	let isShared = $state(false);
+	let ownShare = $state('');
+	let refundOpen = $state(false);
+	let refundAmount = $state('');
+	let refundDate = $state('2026-10-13');
+	let refundError = $state('');
+	let selectedShared = $derived(shared.find(s => s.expenseId === selected?.id));
+	let formTotal = $derived(parseAmount(amount));
+	let ownShareCents = $derived(parseShare(ownShare));
 	let toast = $state('');
 	let moreOpen = $state(false);
 	let formDialog: HTMLDialogElement;
@@ -134,6 +144,11 @@
 			.filter((c) => c.amount > 0)
 			.toSorted((a, b) => b.amount - a.amount),
 	);
+	function parseShare(value: string): number | null {
+		if (/^0(?:[,.]0{1,2})?$/.test(value.trim())) return 0;
+		return parseAmount(value);
+	}
+	const inputMoney = (cents: number) => `${Math.trunc(cents / 100)},${String(cents % 100).padStart(2, '0')}`;
 	const dateLabel = (value: string) =>
 		new Intl.DateTimeFormat('es-ES', {
 			day: 'numeric',
@@ -180,26 +195,37 @@
 		account = accounts[0];
 		destination = accounts[1];
 		fixed = false;
+		isShared = false;
+		ownShare = '';
 		error = '';
 		formDialog.showModal();
 	}
-	function editFatherExpense(movement: Movement) {
-		if (
-			role !== 'admin' ||
-			movement.context !== 'father' ||
-			movement.kind !== 'expense'
-		)
-			return;
+	function editExpense(movement: Movement) {
+		if (role !== 'admin' || movement.kind !== 'expense') return;
+		detailDialog.close();
 		openForm();
-		entryContext = 'father';
+		entryContext = movement.context;
 		editingId = movement.id;
 		concept = movement.concept;
-		amount = `${Math.trunc(movement.amount / 100)},${String(movement.amount % 100).padStart(2, '0')}`;
+		amount = inputMoney(movement.amount);
 		date = movement.date;
 		category = movement.category;
 		account = movement.account;
 		fixed = movement.fixed;
-		detailDialog.close();
+		const record = shared.find(s => s.expenseId === movement.id);
+		isShared = !!record;
+		ownShare = record ? inputMoney(movement.amount - record.expected) : '';
+	}
+	function saveRefund(event: SubmitEvent) {
+		event.preventDefault();
+		if (!selected || role !== 'admin') return;
+		const cents = parseAmount(refundAmount);
+		if (cents === null) { refundError = 'Introduce un importe positivo válido.'; return; }
+		try {
+			shared = addRefund(shared, movements, selected.id, {id: crypto.randomUUID(), date: refundDate, amount: cents});
+			refundOpen = false;
+			toast = 'Reembolso registrado.';
+		} catch (e) { refundError = e instanceof Error ? e.message : 'No se ha podido guardar.'; }
 	}
 	function updateBudget(
 		context: Context,
@@ -265,12 +291,20 @@
 			fixed: kind === 'expense' && fixed,
 		};
 		try {
-			movements =
+			if (entryContext === 'own' && kind === 'expense') {
+				if (isShared && (ownShareCents === null || ownShareCents >= cents)) {
+					error = 'Introduce tu parte: debe ser menor que el importe total.';
+					return;
+				}
+				const nextShared = updateShared(shared, movement, isShared ? cents - ownShareCents! : null);
+				movements = editingId ? movements.map(m => m.id === editingId ? movement : m) : [movement, ...movements];
+				shared = nextShared;
+			} else movements =
 				entryContext === 'father'
 					? saveFatherExpense(movements, movement, role)
 					: [movement, ...movements];
-		} catch {
-			error = 'No se puede guardar este gasto en el contexto del padre.';
+		} catch (caught) {
+			error = caught instanceof Error ? caught.message : 'No se puede guardar este gasto.';
 			return;
 		}
 		if (entryContext === 'own') month = date.slice(0, 7);
@@ -283,6 +317,9 @@
 	}
 	function showDetail(movement: Movement) {
 		selected = movement;
+		refundOpen = false;
+		refundAmount = '';
+		refundError = '';
 		detailDialog.showModal();
 	}
 </script>
@@ -712,7 +749,6 @@
 						>
 					</div>
 				</section>
-				<Records mode="own" {role} {movements} {loans} {shared} onloans={(v) => loans = v} onshared={(v) => shared = v} />
 			{:else if page === 'father'}
 				<div class="context-notice">
 					<Icon name="shield" size={19} />
@@ -786,25 +822,14 @@
 						</section>
 					</div>
 				{:else if fatherTab === 'Gastos / Presupuestos'}
-					<FatherBudgets {movements} {budgets} />
+					{#if !fatherAllExpenses}<FatherBudgets {movements} {budgets} />{/if}
 					<section class="panel father-expense-list">
 						<div class="panel-title">
-							<div>
-								<h2>Lo que has gastado</h2>
-								<p>
-									{role === 'admin'
-										? 'Gastos de mayo a octubre · abre el detalle para editar'
-										: 'Movimientos registrados en octubre'}
-								</p>
-							</div>
+							<div><h2>{fatherAllExpenses ? 'Histórico de gastos' : 'Últimos gastos'}</h2>
+								<p>{fatherAllExpenses ? 'Todos los gastos registrados' : 'Los 5 gastos más recientes'}</p></div>
+							<button class="text-button" onclick={() => fatherAllExpenses = !fatherAllExpenses}>{fatherAllExpenses ? 'Volver' : 'Ver histórico de gastos'}</button>
 						</div>
-						{@render movementList(
-							fatherMovements.filter(
-								(m) =>
-									m.kind === 'expense' &&
-									(role === 'admin' || m.date.startsWith(DEMO_MONTH)),
-							),
-						)}
+						{@render movementList(fatherMovements.filter(m => m.kind === 'expense').slice(0, fatherAllExpenses ? undefined : 5))}
 					</section>
 				{:else if fatherTab === 'Histórico'}<FatherHistory {movements} />
 				{:else}<Records mode="father" {role} {movements} {loans} {shared} onloans={(v) => loans = v} onshared={(v) => shared = v} />{/if}
@@ -902,7 +927,7 @@
 			</p>
 			<h2 id="entry-title">
 				{editingId
-					? 'Editar gasto del padre'
+					? (entryContext === 'father' ? 'Editar gasto del padre' : 'Editar gasto')
 					: entryContext === 'father'
 						? 'Nuevo gasto del padre'
 						: 'Nuevo movimiento'}
@@ -921,7 +946,7 @@
 			role="group"
 			aria-label="Significado de la operación"
 		>
-			{#each entryContext === 'father' ? [{ value: 'expense', label: 'Gasto del padre' }] : [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }] as option}<button
+			{#each entryContext === 'father' || editingId ? [{ value: 'expense', label: entryContext === 'father' ? 'Gasto del padre' : 'Gasto' }] : [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Ingreso' }, { value: 'transfer', label: 'Transferencia' }] as option}<button
 					type="button"
 					class:active={kind === option.value}
 					aria-pressed={kind === option.value}
@@ -992,7 +1017,18 @@
 				ingresos, gastos ni ahorro.
 			</p>{:else if kind === 'expense'}<label class="checkbox-label"
 				><input type="checkbox" bind:checked={fixed} />Es un gasto fijo</label
-			>{/if}{#if error}<p class="form-error" role="alert">{error}</p>{/if}
+			>{/if}
+		{#if kind === 'expense' && entryContext === 'own'}
+			<label class="checkbox-label"><input type="checkbox" bind:checked={isShared} />Es un gasto compartido</label>
+			{#if isShared}
+				<label>Mi parte (€)<input type="text" inputmode="decimal" bind:value={ownShare} required placeholder="0,00" /></label>
+				<p class="form-hint">Total pagado: {formTotal === null ? '—' : money(formTotal)} · Te deben en total: {formTotal !== null && ownShareCents !== null && ownShareCents <= formTotal ? money(formTotal - ownShareCents) : '—'}</p>
+				{#if editingId && shared.find(s => s.expenseId === editingId)}
+					{@const received = shared.find(s => s.expenseId === editingId)!.payments.reduce((sum, payment) => sum + payment.amount, 0)}
+					<p class="form-hint">Recibido: {money(received)} · Pendiente: {formTotal !== null && ownShareCents !== null && formTotal - ownShareCents >= received ? money(formTotal - ownShareCents - received) : '—'}</p>
+				{:else}<p class="form-hint">Lo pendiente disminuye al registrar cada reembolso.</p>{/if}
+			{/if}
+		{/if}{#if error}<p class="form-error" role="alert">{error}</p>{/if}
 		<div class="dialog-actions">
 			<button class="secondary" type="button" onclick={() => formDialog.close()}
 				>Cancelar</button
@@ -1057,10 +1093,27 @@
 						? 'Compra contabilizada una sola vez. La liquidación todavía no está disponible.'
 						: ''}
 		</p>
-		{#if role === 'admin' && selected.context === 'father' && selected.kind === 'expense'}<button
+		{#if selectedShared}
+			{@const received = selectedShared.payments.reduce((sum, payment) => sum + payment.amount, 0)}
+			<section aria-label="Gasto compartido">
+				<h3>Gasto compartido</h3>
+				<p>Tu parte: {money(selected.amount - selectedShared.expected)} · Recibido: {money(received)} · Pendiente: {money(selectedShared.expected - received)}</p>
+				<p class="form-hint">Gasto neto actual: {money(selected.amount - received)}. Se actualiza al recibir reembolsos.</p>
+				{#each selectedShared.payments as payment (payment.id)}<p>Reembolso · {payment.date} · {money(payment.amount)}</p>{/each}
+				{#if selectedShared.expected > received && !refundOpen}<button class="secondary" onclick={() => { refundOpen = true; refundDate = selected!.date; }}>Registrar reembolso</button>{/if}
+				{#if refundOpen}<form onsubmit={saveRefund}>
+					<label>Importe recibido (€)<input bind:value={refundAmount} inputmode="decimal" required /></label>
+					<label>Fecha de recepción<input type="date" bind:value={refundDate} required /></label>
+					<p class="form-hint">Cuenta principal · Se imputa al gasto original.</p>
+					{#if refundError}<p class="form-error" role="alert">{refundError}</p>{/if}
+					<div class="dialog-actions"><button class="secondary" type="button" onclick={() => refundOpen = false}>Cancelar</button><button class="primary" type="submit">Guardar reembolso</button></div>
+				</form>{/if}
+			</section>
+		{/if}
+		{#if role === 'admin' && selected.kind === 'expense'}<button
 				class="primary full-width"
-				onclick={() => selected && editFatherExpense(selected)}
-				>Editar gasto del padre</button
+				onclick={() => selected && editExpense(selected)}
+				>Editar gasto</button
 			>{/if}
 		<button class="secondary full-width" onclick={() => detailDialog.close()}
 			>Volver</button

@@ -30,3 +30,18 @@ export function addRefund(items: Shared[], movements: Movement[], expenseId: str
 export function netMovements(movements: Movement[], shared: Shared[]): Movement[] {
  return movements.map(m => { const s = shared.find(x => x.expenseId === m.id); return s ? {...m, amount: m.amount - s.payments.reduce((n,p) => n + p.amount, 0)} : m; });
 }
+
+export function updateShared(items: Shared[], expense: Movement, expected: number | null): Shared[] {
+ const existing = items.find(s => s.expenseId === expense.id);
+ const payments = existing?.payments ?? [];
+ const received = payments.reduce((sum, payment) => sum + payment.amount, 0);
+ if (expense.context !== 'own' || expense.kind !== 'expense') throw new Error('El gasto compartido no es válido.');
+ if (payments.some(payment => payment.date < expense.date)) throw new Error('La fecha del gasto no puede ser posterior a un reembolso registrado.');
+ if (expected === null) {
+  if (received > 0) throw new Error('No se puede quitar el gasto compartido mientras tenga reembolsos.');
+  return items.filter(s => s.expenseId !== expense.id);
+ }
+ if (!valid(expected) || expected > expense.amount || expected < received) throw new Error('Lo que esperas recuperar debe ser mayor que cero, no superar el gasto ni ser inferior a lo ya recibido.');
+ const next = { expenseId: expense.id, expected, payments };
+ return existing ? items.map(s => s.expenseId === expense.id ? next : s) : [...items, next];
+}
